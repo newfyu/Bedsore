@@ -29,6 +29,13 @@ class BedsoreDataset(object):
         boxes,labels = [],[]
         image_id = torch.tensor([idx])
         
+        fname = self.data[idx][1]['annotation']['filename'][:-4]
+        mask_path = f'{self.root}/VOCdevkit/VOC2007/SegmentationClass/{fname}.png'
+        if os.path.exists(mask_path):
+            mask = Image.open(mask_path)
+        else:
+            mask = None
+        
         if isinstance(self.data[idx][1]['annotation']['object'], list):
             for i in self.data[idx][1]['annotation']['object']: 
                 bbox = list(i['bndbox'].values())
@@ -48,6 +55,12 @@ class BedsoreDataset(object):
         
         if self.transforms is not None:
             img, target = self.transforms(img, target)
+        if mask:
+            target['masks'] = torchvision.transforms.ToTensor()(mask)
+        else:
+            w = int(self.data[idx][1]['annotation']['size']['width'])
+            h = int(self.data[idx][1]['annotation']['size']['height'])
+            target['masks'] = torch.zeros((3,h,w))
 
         return img, target
 

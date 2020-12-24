@@ -2,3 +2,5 @@ bak
 data
 __pycache__
 lightning_logs
+mlruns
+.ipynb_checkpoints
