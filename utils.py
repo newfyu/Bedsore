@@ -1,4 +1,5 @@
 import demjson
+import torchvision
 
 # 项目中使用的一些零散有用函数等
 
@@ -22,3 +23,10 @@ import demjson
 def collate_fn(batch):
     #  print(batch)
     return tuple(zip(*batch))
+
+
+def batch2pil(x, nrow=8, normalize=True, padding=1, pad_value=1, range=None):
+    grid = torchvision.utils.make_grid(
+      x, normalize=normalize, nrow=nrow, pad_value=pad_value, padding=padding, range=range
+    )
+    return torchvision.transforms.ToPILImage()(grid.cpu())

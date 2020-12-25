@@ -30,11 +30,32 @@ class BedsoreDataset(object):
         image_id = torch.tensor([idx])
         
         fname = self.data[idx][1]['annotation']['filename'][:-4]
-        mask_path = f'{self.root}/VOCdevkit/VOC2007/SegmentationClass/{fname}.png'
-        if os.path.exists(mask_path):
-            mask = Image.open(mask_path)
+        mask_class_path = f'{self.root}/VOCdevkit/VOC2007/SegmentationClass/{fname}.png'
+        mask_object_path = f'{self.root}/VOCdevkit/VOC2007/SegmentationObject/{fname}.png'
+        if os.path.exists(mask_object_path):
+            mask = Image.open(mask_object_path).convert('L')
+            mask = np.array(mask)
+            obj_ids = np.unique(mask)[1:]
+            masks = mask == obj_ids[:, None, None]
+            mask_class = Image.open(mask_class_path).convert('L')
+            mask_class = np.array(mask_class)
+            mask_class = masks * mask_class
+            mask_label = mask_class.max(1).max(1).tolist()
+            ccc = {137:7,173:8,98:9} # 137:Necrotic,173:slough,98:Granulation
+            mask_label = [ccc[i] if i in ccc else i for i in mask_label]
+            num_objs = len(obj_ids)
+            mask_boxes = []
+            for i in range(num_objs):
+                pos = np.where(masks[i])
+                xmin = float(np.min(pos[1]))
+                xmax = float(np.max(pos[1]))
+                ymin = float( np.min(pos[0]))
+                ymax = float(np.max(pos[0]))
+                mask_boxes.append([xmin, ymin, xmax, ymax])
         else:
-            mask = None
+            masks = None
+            mask_boxes = []
+            mask_label = []
         
         if isinstance(self.data[idx][1]['annotation']['object'], list):
             for i in self.data[idx][1]['annotation']['object']: 
@@ -47,20 +68,25 @@ class BedsoreDataset(object):
             bbox = list(map(float,bbox))
             boxes.append(bbox)
             labels.append(self.label_dict[self.data[idx][1]['annotation']['object']['name']])
-            
+
+        pre_masks = torch.zeros(len(labels),img.size[1],img.size[0])
+        labels = labels + mask_label
         target = {}
+        boxes = boxes + mask_boxes
         target['boxes'] = torch.as_tensor(boxes, dtype=torch.float32)
         target['labels'] = torch.as_tensor(labels, dtype=torch.int64)
         target['image_id'] = torch.as_tensor(image_id, dtype=torch.int64)
+
+        if masks is not None:
+            masks = torch.from_numpy(masks)
+            masks = torch.cat((pre_masks,masks),dim=0)
+            target['masks'] = masks 
+        else:
+            target['masks'] = pre_masks 
+            
         
         if self.transforms is not None:
             img, target = self.transforms(img, target)
-        if mask:
-            target['masks'] = torchvision.transforms.ToTensor()(mask)
-        else:
-            w = int(self.data[idx][1]['annotation']['size']['width'])
-            h = int(self.data[idx][1]['annotation']['size']['height'])
-            target['masks'] = torch.zeros((3,h,w))
 
         return img, target
 
@@ -76,7 +102,6 @@ class BedsoreDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.seed = seed
 
-    def setup(self):
         tfmc_train = Compose([
             ToTensor()
         ])

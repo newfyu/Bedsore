@@ -56,6 +56,7 @@ class RandomHorizontalFlip(object):
         if random.random() < self.prob:
             W, H = image.size
             image = T.functional.hflip(image)
+            target['masks'] = T.functional.hflip(target['masks'])
             boxes = target['boxes']
             boxes2 = boxes.clone()
             boxes[:, 0] = W - boxes2[:, 2]
