@@ -72,6 +72,7 @@ class RandomVerticalFlip(object):
         if random.random() < self.prob:
             W, H = image.size
             image = T.functional.vflip(image)
+            target['masks'] = T.functional.vflip(target['masks'])
             boxes = target['boxes']
             boxes2 = boxes.clone()
             boxes[:, 1] = H - boxes2[:, 3]
@@ -90,6 +91,7 @@ class RandomRotate(object):
             boxes2 = boxes.clone()
             if angle == 90:
                 image = T.functional.rotate(image, 90, expand=True)
+                target['masks'] = T.functional.rotate(target['masks'], 90, expand=True)
                 boxes[:, 0] = boxes2[:, 1]
                 boxes[:, 1] = W - boxes2[:, 2]
                 boxes[:, 2] = boxes2[:, 3]
@@ -118,9 +120,28 @@ class RandomResize(object):
         if random.random() < self.prob:
             W, H = image.size
             image = T.functional.resize(image, (int(H*self.h_scale),int(W*self.w_scale)))
+            target['masks'] = T.functional.resize(target['masks'], (int(H*self.h_scale),int(W*self.w_scale)))
             boxes = target['boxes']
             boxes[:, [0,2]] *= self.w_scale
             boxes[:, [1,3]] *= self.h_scale
+        return image, target
+
+class RandomColorJitter(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, image, target):
+        if random.random() < self.prob:
+            image = T.transforms.ColorJitter(0.3,0.3,0.3,0)(image)
+        return image, target
+
+class RandomErasing(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, image, target):
+        if random.random() < self.prob:
+            image = T.transforms.RandomErasing(scale=(0.02,0.05),p=1)(image)
         return image, target
 
 class ToTensor(object):

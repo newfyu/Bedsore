@@ -62,9 +62,11 @@ class MyFasterRCNN(pl.LightningModule):
         parser.add_argument("--name", type=str, default="test")
         parser.add_argument('--lr', type=float, default=1e-4)
         parser.add_argument('--num_classes', type=int, default=10)
-        parser.add_argument('--batch_size', type=int, default=1)
+        parser.add_argument('--batch_size', type=int, default=3)
+        parser.add_argument('--num_valid', type=int, default=100)
         parser.add_argument('--seed', type=int, default=32)
         parser.add_argument('--data_root', type=str, default='data')
+        parser.add_argument('--distributed_backend', type=str, default='dp')
         parser.add_argument("--amp_level", type=str, default="O0")
         return parser
 
@@ -76,7 +78,7 @@ def main():
     args = parser.parse_args()
     seed_everything(args.seed)
     model = MyFasterRCNN(args)
-    dm = BedsoreDataModule(args.data_root, args.batch_size, seed=args.seed)
+    dm = BedsoreDataModule(args.data_root, args.batch_size, args.num_valid, seed=args.seed)
     dm.setup()
     trainer = Trainer.from_argparse_args(args)
     if args.name != "test":
@@ -85,7 +87,6 @@ def main():
         logger = None
     trainer.logger = logger
     trainer.fit(model, dm)
-
 
 
 if __name__ == '__main__':
