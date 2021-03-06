@@ -3,7 +3,9 @@ import random
 import torch
 from torchvision.transforms import functional as F
 import torchvision.transforms as T
+from pl_bolts.transforms.dataset_normalizations import imagenet_normalization
 from collections import Iterable
+from PIL import ImageFilter
 
 
 def _flip_coco_person_keypoints(kps, width):
@@ -18,34 +20,14 @@ def _flip_coco_person_keypoints(kps, width):
 
 class Compose(object):
     def __init__(self, transforms):
-        self.transforms = transforms # list
+        self.transforms = transforms  # list
 
     def __call__(self, image, target):
         for t in self.transforms:
-            if isinstance(t, Iterable): # 如果transformers中元素是一个列表，则随机选择一个
+            if isinstance(t, Iterable):  # 如果transformers中元素是一个列表，则随机选择一个
                 t = random.choice(t)
             image, target = t(image, target)
         return image, target
-
-
-#  class RandomHorizontalFlip(object):
-    #  def __init__(self, prob):
-        #  self.prob = prob
-
-    #  def __call__(self, image, target):
-        #  if random.random() < self.prob:
-        #  height, width = image.shape[-2:]
-        #  image = image.flip(-1)
-        #  bbox = target["boxes"]
-        #  bbox[:, [0, 2]] = width - bbox[:, [2, 0]]
-        #  target["boxes"] = bbox
-        #  if "masks" in target:
-        #  target["masks"] = target["masks"].flip(-1)
-        #  if "keypoints" in target:
-        #  keypoints = target["keypoints"]
-        #  keypoints = _flip_coco_person_keypoints(keypoints, width)
-        #  target["keypoints"] = keypoints
-        #  return image, target
 
 
 class RandomHorizontalFlip(object):
@@ -79,13 +61,14 @@ class RandomVerticalFlip(object):
             boxes[:, 3] = H - boxes2[:, 1]
         return image, target
 
+
 class RandomRotate(object):
     def __init__(self, prob=0.5):
         self.prob = prob
 
     def __call__(self, image, target):
         if random.random() < self.prob:
-            angle = random.choice([90,180,270])
+            angle = random.choice([90, 180, 270])
             W, H = image.size
             boxes = target['boxes']
             boxes2 = boxes.clone()
@@ -98,20 +81,23 @@ class RandomRotate(object):
                 boxes[:, 3] = W - boxes2[:, 0]
             if angle == 180:
                 image = T.functional.rotate(image, 180, expand=True)
+                target['masks'] = T.functional.rotate(target['masks'], 180, expand=True)
                 boxes[:, 0] = W - boxes2[:, 2]
                 boxes[:, 1] = H - boxes2[:, 3]
                 boxes[:, 2] = W - boxes2[:, 0]
                 boxes[:, 3] = H - boxes2[:, 1]
             if angle == 270:
                 image = T.functional.rotate(image, 270, expand=True)
+                target['masks'] = T.functional.rotate(target['masks'], 270, expand=True)
                 boxes[:, 0] = H - boxes2[:, 3]
                 boxes[:, 1] = boxes2[:, 0]
                 boxes[:, 2] = H - boxes2[:, 1]
                 boxes[:, 3] = boxes2[:, 2]
         return image, target
 
+
 class RandomResize(object):
-    def __init__(self, prob=0.5, w_scale=(0.5,1.5), h_scale=(0.5,1.5)):
+    def __init__(self, prob=0.5, w_scale=(0.5, 1.5), h_scale=(0.5, 1.5)):
         self.prob = prob
         self.w_scale = random.uniform(w_scale[0], w_scale[1])
         self.h_scale = random.uniform(h_scale[0], h_scale[1])
@@ -119,12 +105,13 @@ class RandomResize(object):
     def __call__(self, image, target):
         if random.random() < self.prob:
             W, H = image.size
-            image = T.functional.resize(image, (int(H*self.h_scale),int(W*self.w_scale)))
-            target['masks'] = T.functional.resize(target['masks'], (int(H*self.h_scale),int(W*self.w_scale)))
+            image = T.functional.resize(image, (int(H * self.h_scale), int(W * self.w_scale)))
+            target['masks'] = T.functional.resize(target['masks'], (int(H * self.h_scale), int(W * self.w_scale)))
             boxes = target['boxes']
-            boxes[:, [0,2]] *= self.w_scale
-            boxes[:, [1,3]] *= self.h_scale
+            boxes[:, [0, 2]] *= self.w_scale
+            boxes[:, [1, 3]] *= self.h_scale
         return image, target
+
 
 class RandomColorJitter(object):
     def __init__(self, prob=0.5):
@@ -132,8 +119,9 @@ class RandomColorJitter(object):
 
     def __call__(self, image, target):
         if random.random() < self.prob:
-            image = T.transforms.ColorJitter(0.3,0.3,0.3,0)(image)
+            image = T.transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)(image)
         return image, target
+
 
 class RandomErasing(object):
     def __init__(self, prob=0.5):
@@ -141,10 +129,48 @@ class RandomErasing(object):
 
     def __call__(self, image, target):
         if random.random() < self.prob:
-            image = T.transforms.RandomErasing(scale=(0.02,0.05),p=1)(image)
+            image = T.transforms.RandomErasing(scale=(0.02, 0.05), p=1)(image)
         return image, target
+
+class RandomGaussianBlur(object):
+    def __init__(self, sigma=(0.1, 2.0), prob=0.5):
+        self.prob = prob
+        self.sigma = sigma
+
+    def __call__(self, image, target):
+        if random.random() < self.prob:
+            sigma = random.uniform(self.sigma[0], self.sigma[1])
+            image = image.filter(ImageFilter.GaussianBlur(radius=sigma))
+        return image, target
+
+class RandomCrop(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, image, target):
+        if random.random() < self.prob:
+            W, H = image.size
+            min_minx = target['boxes'][:, 0].min()
+            min_miny = target['boxes'][:, 1].min()
+            min_maxx = target['boxes'][:, 2].max()
+            min_maxy = target['boxes'][:, 3].max()
+            a = int(random.uniform(0, min_minx))
+            b = int(random.uniform(0, min_miny))
+            c = int(random.uniform(min_maxx, W))
+            d = int(random.uniform(min_maxy, H))
+            target['boxes'][:, 0] -= a
+            target['boxes'][:, 2] -= a
+            target['boxes'][:, 1] -= b
+            target['boxes'][:, 3] -= b
+            image = T.functional.crop(image, b, a, d - b, c - a)
+            target['masks'] = T.functional.crop(target['masks'], b, a, d - b, c - a)
+        return image, target
+
 
 class ToTensor(object):
     def __call__(self, image, target):
         image = F.to_tensor(image)
+        #  image = imagenet_normalization()(image)
         return image, target
+
+

@@ -1,18 +1,21 @@
 # -*- coding: utf-8 -*-
+import copy
 import os
 import pathlib
-import copy
 
 import numpy as np
 import torch
+import torchvision
 import torchvision.transforms as T
 from PIL import Image
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
-import torchvision
 
-from detection_transforms import RandomHorizontalFlip, RandomVerticalFlip, RandomRotate, RandomResize, RandomColorJitter, RandomErasing, Compose, ToTensor
 import utils
+from detection_transforms import (Compose, RandomColorJitter, RandomCrop,
+                                  RandomErasing, RandomHorizontalFlip,
+                                  RandomResize, RandomRotate,
+                                  RandomGaussianBlur, RandomVerticalFlip, ToTensor)
 
 
 class BedsoreDataset(object):
@@ -95,24 +98,30 @@ class BedsoreDataset(object):
 
 class BedsoreDataModule(LightningDataModule):
 
-    def __init__(self, root, batch_size, num_valid, seed=32):
+    def __init__(self, root, batch_size, num_valid, trans_prob, seed=32):
         super().__init__()
         self.root = root
         self.batch_size = batch_size
         self.seed = seed
 
-        #  tfmc_train = Compose([
-        #  ToTensor()
-        #  ])
         tfmc_train = Compose([
-            RandomColorJitter(),
-            (RandomHorizontalFlip(),
-             RandomVerticalFlip()),
-            (RandomResize(),
-             RandomRotate()),
-            ToTensor(),
-            RandomErasing(),
+        RandomCrop(trans_prob),
+        RandomGaussianBlur((0.1, 1), trans_prob),
+        RandomColorJitter(trans_prob),
+        (RandomHorizontalFlip(0.8), RandomVerticalFlip(0.8), RandomRotate(0.8)),
+        RandomResize(trans_prob),
+        ToTensor(),
+        RandomErasing(),
         ])
+        #  tfmc_train = Compose([
+            #  RandomCrop(trans_prob),
+            #  RandomGaussianBlur((0.1, 1.5), trans_prob),
+            #  RandomColorJitter(trans_prob),
+            #  (RandomHorizontalFlip(trans_prob), RandomVerticalFlip(trans_prob)),
+            #  (RandomResize(trans_prob), RandomRotate(trans_prob)),
+            #  ToTensor(),
+            #  RandomErasing(),
+        #  ])
         tfmc_valid = Compose([
             ToTensor()
         ])

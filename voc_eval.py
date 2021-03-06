@@ -106,7 +106,7 @@ def voc_eval(detpath,
     recs = {}
     for i, imagename in enumerate(imagenames):
         recs[imagename] = parse_rec(annopath.format(imagename))
-    print('{:d} annotationd have been read'.format(len(imagenames)))
+    #  print('{:d} annotationd have been read'.format(len(imagenames)))
 
     # extract gt objects for this class
     class_recs = {}
@@ -178,7 +178,7 @@ def voc_eval(detpath,
                 fp[d] = 1.
 
     # compute precision recall
-    print('tp:',tp,'fp:',fp)
+    #  print('tp:',tp,'fp:',fp)
     fp = np.cumsum(fp)
     tp = np.cumsum(tp)
     rec = tp / float(npos)

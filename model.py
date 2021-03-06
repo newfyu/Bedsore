@@ -1,4 +1,5 @@
 import os
+import shutil
 from argparse import ArgumentParser
 
 import pytorch_lightning as pl
@@ -24,7 +25,7 @@ class MyFasterRCNN(pl.LightningModule):
         super().__init__()
         self.hparams = hparams
         #  self.net = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
-        self.net = maskrcnn_resnet50_fpn(pretrained=True)
+        self.net = maskrcnn_resnet50_fpn(pretrained=True,trainable_backbone_layers=self.hparams.train_layers)
         in_features = self.net.roi_heads.box_predictor.cls_score.in_features
         self.net.roi_heads.box_predictor = FastRCNNPredictor(in_features, self.hparams.num_classes)
 
@@ -68,6 +69,9 @@ class MyFasterRCNN(pl.LightningModule):
         parser.add_argument('--data_root', type=str, default='data')
         parser.add_argument('--distributed_backend', type=str, default='dp')
         parser.add_argument("--amp_level", type=str, default="O0")
+        parser.add_argument("--train_layers", type=int, default=3)
+        parser.add_argument("--trans_prob", type=float, default=0.5)
+        parser.add_argument("--max_epochs", type=int, default=40)
         return parser
 
 
@@ -78,11 +82,16 @@ def main():
     args = parser.parse_args()
     seed_everything(args.seed)
     model = MyFasterRCNN(args)
-    dm = BedsoreDataModule(args.data_root, args.batch_size, args.num_valid, seed=args.seed)
+    dm = BedsoreDataModule(args.data_root, args.batch_size, args.num_valid, args.trans_prob,seed=args.seed)
     dm.setup()
     trainer = Trainer.from_argparse_args(args)
     if args.name != "test":
         logger = MLFlowLogger2(experiment_name=args.exp, run_name=args.name)
+        # save source files to mlflow
+        save_dir = f"mlruns/{logger.experiment_id}/{logger.run_id}/artifacts"
+        save_files = [i for i in os.listdir() if '.py' in i]
+        for i in save_files:
+            shutil.copy(i,f'{save_dir}/{i}') 
     else:
         logger = None
     trainer.logger = logger
@@ -91,3 +100,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# python model.py --gpus '1,' --max_epochs 50 --name test
