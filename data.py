@@ -10,12 +10,14 @@ import torchvision.transforms as T
 from PIL import Image
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
+import albumentations as album
+from albumentations.pytorch import ToTensorV2,ToTensor
 
 import utils
-from detection_transforms import (Compose, RandomColorJitter, RandomCrop,
-                                  RandomErasing, RandomHorizontalFlip,
-                                  RandomResize, RandomRotate,
-                                  RandomGaussianBlur, RandomVerticalFlip, ToTensor)
+#  from detection_transforms import (Compose, RandomColorJitter, RandomCrop,
+                                  #  RandomErasing, RandomHorizontalFlip,
+                                  #  RandomResize, RandomRotate,
+                                  #  RandomGaussianBlur, RandomVerticalFlip, ToTensor)
 
 
 class BedsoreDataset(object):
@@ -88,7 +90,10 @@ class BedsoreDataset(object):
             target['masks'] = pre_masks
 
         if self.transforms is not None:
-            image, target = self.transforms(image, target)
+            transformed = self.transforms(image=np.array(image), bboxes=target['boxes'], mask=target['masks'].permute(1, 2, 0).numpy(), category_ids=target['labels'])
+            image = transformed['image']
+            target['boxes'] = torch.as_tensor(transformed['bboxes'], dtype=torch.float32)
+            target['masks'] = transformed['mask'][0].permute(2,0,1)
 
         return image, target
 
@@ -100,36 +105,30 @@ class BedsoreDataModule(LightningDataModule):
 
     def __init__(self, root, batch_size, num_valid, trans_prob, seed=32):
         super().__init__()
-        self.root = root
-        self.batch_size = batch_size
-        self.seed = seed
+        self.root=root
+        self.batch_size=batch_size
+        self.seed=seed
 
-        tfmc_train = Compose([
-            #  RandomCrop(trans_prob),
-            RandomGaussianBlur((0.1, 1.5), trans_prob),
-            RandomColorJitter(trans_prob),
-            (RandomHorizontalFlip(0.8), RandomVerticalFlip(0.8), RandomRotate(0.8)),
-            RandomResize(trans_prob),
-            ToTensor(),
-            RandomErasing(),
-        ])
-        #  tfmc_train = Compose([
-            #  RandomCrop(trans_prob),
-            #  RandomGaussianBlur((0.1, 1.5), trans_prob),
-            #  RandomColorJitter(trans_prob),
-            #  (RandomHorizontalFlip(trans_prob), RandomVerticalFlip(trans_prob)),
-            #  (RandomResize(trans_prob), RandomRotate(trans_prob)),
-            #  ToTensor(),
-            #  RandomErasing(),
-        #  ])
-        tfmc_valid = Compose([
-            ToTensor()
-        ])
-        ds = BedsoreDataset(self.root, transforms=tfmc_train)
-        self.train_ds, self.valid_ds = torch.utils.data.random_split(
+        tfmc_train = album.Compose([
+            album.RandomScale(p=trans_prob),
+            album.RandomShadow(p=trans_prob),
+            album.HorizontalFlip(p=trans_prob),
+            album.ShiftScaleRotate(p=trans_prob),
+            album.RandomBrightnessContrast(p=0.3),
+            album.RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
+            ToTensor()],
+            bbox_params=album.BboxParams(format='pascal_voc', label_fields=['category_ids']
+            ))
+        tfmc_valid = album.Compose([
+            ToTensor()],
+            bbox_params=album.BboxParams(format='pascal_voc', label_fields=['category_ids']
+            ))
+
+        ds=BedsoreDataset(self.root, transforms=tfmc_train)
+        self.train_ds, self.valid_ds=torch.utils.data.random_split(
             ds, [len(ds) - num_valid, num_valid], generator=torch.Generator().manual_seed(self.seed))
-        self.valid_ds = copy.deepcopy(self.valid_ds)
-        self.valid_ds.dataset.transforms = tfmc_valid  # 如果验证集要调整transformer
+        self.valid_ds=copy.deepcopy(self.valid_ds)
+        self.valid_ds.dataset.transforms=tfmc_valid  # 如果验证集要调整transformer
 
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=self.batch_size, shuffle=True, num_workers=16, collate_fn=utils.collate_fn)
@@ -139,16 +138,4 @@ class BedsoreDataModule(LightningDataModule):
 
 
 if __name__ == '__main__':
-    root = 'data'
-    tfmc = T.transforms.Compose([
-        T.ToTensor(),
-    ])
-
-    dm = BedsoreDataModule(root, batch_size=8)
-    dm.setup()
-    print(len(dm.train_ds))
-    print(len(dm.valid_ds))
-    out = next(iter(dm.train_dataloader()))
-    import ipdb
-    ipdb.set_trace()
     pass
