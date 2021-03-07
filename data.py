@@ -26,7 +26,7 @@ class BedsoreDataset(object):
         self.label_dict = {'1期': 1, '2期': 2, '3期': 3, '4期': 4, '不可分期': 5, '深部组织损伤': 6}
 
     def __getitem__(self, idx):
-        img = self.data[idx][0]
+        image = self.data[idx][0]
 
         boxes, labels = [], []
         image_id = torch.tensor([idx])
@@ -71,7 +71,7 @@ class BedsoreDataset(object):
             boxes.append(bbox)
             labels.append(self.label_dict[self.data[idx][1]['annotation']['object']['name']])
 
-        pre_masks = torch.zeros(len(labels), img.size[1], img.size[0])
+        pre_masks = torch.zeros(len(labels), image.size[1], image.size[0])
         labels = labels + mask_label
         target = {}
         boxes = boxes + mask_boxes
@@ -88,9 +88,9 @@ class BedsoreDataset(object):
             target['masks'] = pre_masks
 
         if self.transforms is not None:
-            img, target = self.transforms(img, target)
+            image, target = self.transforms(image, target)
 
-        return img, target
+        return image, target
 
     def __len__(self):
         return len(self.data)
@@ -105,13 +105,13 @@ class BedsoreDataModule(LightningDataModule):
         self.seed = seed
 
         tfmc_train = Compose([
-        RandomCrop(trans_prob),
-        RandomGaussianBlur((0.1, 1), trans_prob),
-        RandomColorJitter(trans_prob),
-        (RandomHorizontalFlip(0.8), RandomVerticalFlip(0.8), RandomRotate(0.8)),
-        RandomResize(trans_prob),
-        ToTensor(),
-        RandomErasing(),
+            #  RandomCrop(trans_prob),
+            RandomGaussianBlur((0.1, 1.5), trans_prob),
+            RandomColorJitter(trans_prob),
+            (RandomHorizontalFlip(0.8), RandomVerticalFlip(0.8), RandomRotate(0.8)),
+            RandomResize(trans_prob),
+            ToTensor(),
+            RandomErasing(),
         ])
         #  tfmc_train = Compose([
             #  RandomCrop(trans_prob),

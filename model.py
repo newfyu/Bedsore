@@ -71,7 +71,7 @@ class MyFasterRCNN(pl.LightningModule):
         parser.add_argument("--amp_level", type=str, default="O0")
         parser.add_argument("--train_layers", type=int, default=3)
         parser.add_argument("--trans_prob", type=float, default=0.5)
-        parser.add_argument("--max_epochs", type=int, default=40)
+        parser.add_argument("--max_epochs", type=int, default=50)
         return parser
 
 
