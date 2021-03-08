@@ -111,7 +111,7 @@ class BedsoreDataModule(LightningDataModule):
 
         tfmc_train = album.Compose([
             album.RandomScale(p=trans_prob),
-            album.RandomShadow(p=trans_prob),
+            #  album.RandomShadow(p=trans_prob),
             album.HorizontalFlip(p=trans_prob),
             album.ShiftScaleRotate(p=trans_prob),
             album.RandomBrightnessContrast(p=0.3),

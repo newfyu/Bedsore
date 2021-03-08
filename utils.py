@@ -43,6 +43,7 @@ def draw_bbox(image, target, th=0.5):
     Returns:
         image: PIL image
     """
+
     if isinstance(image, Image.Image):
         image = T.ToTensor()(image)
     c, h, w = image.shape
@@ -65,6 +66,27 @@ def draw_bbox(image, target, th=0.5):
                 box = boxes[i].tolist()
                 draw.rectangle(box, outline=(44, 150, 120), width=line_width)
                 draw.text((box[0] + 5, box[1] + 2), str(labels[i].item()), font=font, fill=(255, 0, 0))
+
+    ry = Image.new("RGB",(w,h),(255,0,0))
+    fr = Image.new("RGB",(w,h),(255,255,0))
+    hs = Image.new("RGB",(w,h),(0,0,255))
+    tissue = {7:hs, 8:fr, 9:ry}
+
+    if 'scores' in target.keys(): # 如果有分数
+        show_labels = target['labels'][target['scores']>th]
+        good_masks = target['masks'][target['scores']>th][show_labels>6]
+        show_labels = show_labels[show_labels>6]
+    else:
+        show_labels = target['labels']
+        good_masks = target['masks'][show_labels>6]
+        show_labels = show_labels[show_labels>6]
+
+    for i,t in enumerate(show_labels):
+        mask = batch2pil(((good_masks[i])>0.5).float())
+        mask = np.array(mask)*0.5
+        mask = Image.fromarray(mask.astype('uint8')).convert('L')
+        image = Image.composite(tissue[t.item()], image, mask)
+
 
     return image
 
