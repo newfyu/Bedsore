@@ -98,10 +98,22 @@ def voc_eval(detpath,
     # assumes imagesetfile is a text file with each line an image name
     # cachedir caches the annotations in a pickle file
 
+    # read dets
+    if isinstance(detpath,str):
+        detfile = detpath.format(classname)
+        with open(detfile, 'r') as f:
+            lines = f.readlines()
+    else:
+        lines = detpath
+    lines = [line for line in lines if line.split()[0] == classname]
+
     # read list of images
-    with open(imagesetfile, 'r') as f:
-        lines = f.readlines()
-    imagenames = [x.strip() for x in lines]
+    if isinstance(imagesetfile,str):
+        with open(imagesetfile, 'r') as f:
+            lines = f.readlines()
+        imagenames = [x.strip() for x in lines]
+    else:
+        imagenames = imagesetfile
 
     recs = {}
     for i, imagename in enumerate(imagenames):
@@ -119,11 +131,6 @@ def voc_eval(detpath,
         class_recs[imagename] = {'bbox': bbox,
                                  'det': det}
 
-    # read dets
-    detfile = detpath.format(classname)
-    with open(detfile, 'r') as f:
-        lines = f.readlines()
-    lines = [line for line in lines if line.split()[0] == classname]
 
     splitlines = [x.strip().split(' ')[1:] for x in lines]
     image_ids = [x[0] for x in splitlines]
