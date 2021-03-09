@@ -21,10 +21,10 @@ import utils
 
 
 class BedsoreDataset(object):
-    def __init__(self, root, transforms=None):
+    def __init__(self, root='data', transforms=None, image_set='train'):
         self.root = root
         self.transforms = transforms
-        self.data = torchvision.datasets.VOCDetection(root, year='2007')
+        self.data = torchvision.datasets.VOCDetection(root, year='2007',image_set=image_set)
         self.label_dict = {'1期': 1, '2期': 2, '3期': 3, '4期': 4, '不可分期': 5, '深部组织损伤': 6}
 
     def __getitem__(self, idx):
@@ -110,12 +110,12 @@ class BedsoreDataModule(LightningDataModule):
         self.seed=seed
 
         tfmc_train = album.Compose([
-            album.RandomScale(p=trans_prob),
-            #  album.RandomShadow(p=trans_prob),
+            #  album.RandomScale(p=trans_prob),
+            album.RandomShadow(p=trans_prob),
             album.HorizontalFlip(p=trans_prob),
             album.ShiftScaleRotate(p=trans_prob),
             album.RandomBrightnessContrast(p=0.3),
-            album.RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
+            #  album.RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
             ToTensor()],
             bbox_params=album.BboxParams(format='pascal_voc', label_fields=['category_ids']
             ))
