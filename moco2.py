@@ -1,11 +1,7 @@
-"""
-Adapted from: https://github.com/facebookresearch/moco
-
-Original work is: Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-This implementation is: Copyright (c) PyTorch Lightning, Inc. and its affiliates. All Rights Reserved
-"""
-
+import copy
+import shutil
 import random
+from argparse import ArgumentParser
 from typing import Union
 
 import pytorch_lightning as pl
@@ -13,10 +9,56 @@ import torch
 import torch.nn.functional as F
 import torchvision
 from PIL import ImageFilter
-from pl_bolts.datamodules.ssl_imagenet_datamodule import SSLImagenetDataModule
+#  from pl_bolts.datamodules.ssl_imagenet_datamodule import SSLImagenetDataModule
 from pl_bolts.metrics import mean, precision_at_k
+from pl_bolts.transforms.dataset_normalizations import imagenet_normalization
 from torch import nn
 from torchvision import transforms
+from pytorch_lightning import LightningDataModule
+from torch.utils.data import DataLoader, random_split
+import os
+from PIL import Image
+from logger import MLFlowLogger2
+
+
+class SSLImageDataset(torch.utils.data.Dataset):
+
+    def __init__(self, root, transforms, suffix='.jpg', test_list_path='data/VOCdevkit/VOC2007/ImageSets/Main/val.txt'):
+        self.root = root
+        self.transforms = transforms
+        self.imglist = [i for i in os.listdir(root) if suffix in i]
+        with open(test_list_path,'r') as f:
+            test_imglist = f.readlines()
+        test_imglist = [i.replace('\n','') +'.jpg' for i in test_imglist]
+        self.imglist = list(set(self.imglist) - set(test_imglist)) # exclude test sample
+            
+
+    def __len__(self):
+        return len(self.imglist)
+
+    def __getitem__(self, idx):
+        img_name = self.imglist[idx]
+        img = Image.open(f"{self.root}/{img_name}").convert('RGB')
+        img1, img2 = self.transforms(img)
+        return img1, img2
+
+
+class SSLImageDataModule(LightningDataModule):
+
+    def __init__(self, root, batch_size, num_valid, img_size=400, seed=32, **kwargs):
+        super().__init__()
+        ds = SSLImageDataset(root, transforms=Moco2TrainImagenetTransforms(img_size))
+        self.batch_size = batch_size
+        self.train_ds, self.valid_ds = torch.utils.data.random_split(
+            ds, [len(ds) - num_valid, num_valid], generator=torch.Generator().manual_seed(seed))
+        self.valid_ds = copy.deepcopy(self.valid_ds)
+        self.valid_ds.dataset.transforms = Moco2EvalImagenetTransforms(img_size)  # 如果验证集要调整transformer
+
+    def train_dataloader(self):
+        return DataLoader(self.train_ds, batch_size=self.batch_size, shuffle=False, num_workers=8, drop_last=True)
+
+    def val_dataloader(self):
+        return DataLoader(self.valid_ds, batch_size=self.batch_size, shuffle=False, num_workers=8)
 
 
 class Moco2TrainImagenetTransforms:
@@ -52,6 +94,7 @@ class Moco2EvalImagenetTransforms:
     https://arxiv.org/pdf/2003.04297.pdf
 
     """
+
     def __init__(self, height=128):
         self.test_transform = transforms.Compose([
             transforms.Resize(height + 32),
@@ -65,6 +108,7 @@ class Moco2EvalImagenetTransforms:
         k = self.test_transform(inp)
         return q, k
 
+
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
 
@@ -75,6 +119,7 @@ class GaussianBlur(object):
         sigma = random.uniform(self.sigma[0], self.sigma[1])
         x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
         return x
+
 
 class MocoV2(pl.LightningModule):
 
@@ -88,44 +133,11 @@ class MocoV2(pl.LightningModule):
                  momentum: float = 0.9,
                  weight_decay: float = 1e-4,
                  datamodule: pl.LightningDataModule = None,
-                 data_dir: str = './',
                  batch_size: int = 256,
                  use_mlp: bool = False,
                  num_workers: int = 8,
                  *args, **kwargs):
         """
-        PyTorch Lightning implementation of `Moco <https://arxiv.org/abs/2003.04297>`_
-
-        Paper authors: Xinlei Chen, Haoqi Fan, Ross Girshick, Kaiming He.
-
-        Code adapted from `facebookresearch/moco <https://github.com/facebookresearch/moco>`_ to Lightning by:
-
-            - `William Falcon <https://github.com/williamFalcon>`_
-
-        Example:
-
-            >>> from pl_bolts.models.self_supervised import MocoV2
-            ...
-            >>> model = MocoV2()
-
-        Train::
-
-            trainer = Trainer()
-            trainer.fit(model)
-
-        CLI command::
-
-            # cifar10
-            python moco2_module.py --gpus 1
-
-            # imagenet
-            python moco2_module.py
-                --gpus 8
-                --dataset imagenet2012
-                --data_dir /path/to/imagenet/
-                --meta_dir /path/to/folder/with/meta.bin/
-                --batch_size 32
-
         Args:
             base_encoder: torchvision model name or torch.nn.Module
             emb_dim: feature dimension (default: 128)
@@ -136,7 +148,6 @@ class MocoV2(pl.LightningModule):
             momentum: optimizer momentum
             weight_decay: optimizer weight decay
             datamodule: the DataModule (train, val, test dataloaders)
-            data_dir: the directory to store data
             batch_size: batch size
             use_mlp: add an mlp to the encoders
             num_workers: workers for the loaders
@@ -145,14 +156,7 @@ class MocoV2(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        # use CIFAR-10 by default if no datamodule passed in
-        if datamodule is None:
-            datamodule = CIFAR10DataModule(data_dir)
-            datamodule.train_transforms = Moco2TrainCIFAR10Transforms()
-            datamodule.val_transforms = Moco2EvalCIFAR10Transforms()
-
         self.datamodule = datamodule
-
         # create the encoders
         # num_classes is the output fc dimension
         self.encoder_q, self.encoder_k = self.init_encoders(base_encoder)
@@ -177,6 +181,7 @@ class MocoV2(pl.LightningModule):
         Override to add your own encoders
         """
 
+        #  backbone = torchvision.models.mobilenet_v2(pretrained=True).features
         template_model = getattr(torchvision.models, base_encoder)
         encoder_q = template_model(num_classes=self.hparams.emb_dim)
         encoder_k = template_model(num_classes=self.hparams.emb_dim)
@@ -195,9 +200,6 @@ class MocoV2(pl.LightningModule):
     @torch.no_grad()
     def _dequeue_and_enqueue(self, keys):
         # gather keys before updating queue
-        if self.use_ddp or self.use_ddp2:
-            keys = concat_all_gather(keys)
-
         batch_size = keys.shape[0]
 
         ptr = int(self.queue_ptr)
@@ -208,53 +210,6 @@ class MocoV2(pl.LightningModule):
         ptr = (ptr + batch_size) % self.hparams.num_negatives  # move pointer
 
         self.queue_ptr[0] = ptr
-
-    @torch.no_grad()
-    def _batch_shuffle_ddp(self, x):  # pragma: no-cover
-        """
-        Batch shuffle, for making use of BatchNorm.
-        *** Only support DistributedDataParallel (DDP) model. ***
-        """
-        # gather from all gpus
-        batch_size_this = x.shape[0]
-        x_gather = concat_all_gather(x)
-        batch_size_all = x_gather.shape[0]
-
-        num_gpus = batch_size_all // batch_size_this
-
-        # random shuffle index
-        idx_shuffle = torch.randperm(batch_size_all).cuda()
-
-        # broadcast to all gpus
-        torch.distributed.broadcast(idx_shuffle, src=0)
-
-        # index for restoring
-        idx_unshuffle = torch.argsort(idx_shuffle)
-
-        # shuffled index for this gpu
-        gpu_idx = torch.distributed.get_rank()
-        idx_this = idx_shuffle.view(num_gpus, -1)[gpu_idx]
-
-        return x_gather[idx_this], idx_unshuffle
-
-    @torch.no_grad()
-    def _batch_unshuffle_ddp(self, x, idx_unshuffle):  # pragma: no-cover
-        """
-        Undo batch shuffle.
-        *** Only support DistributedDataParallel (DDP) model. ***
-        """
-        # gather from all gpus
-        batch_size_this = x.shape[0]
-        x_gather = concat_all_gather(x)
-        batch_size_all = x_gather.shape[0]
-
-        num_gpus = batch_size_all // batch_size_this
-
-        # restored index for this gpu
-        gpu_idx = torch.distributed.get_rank()
-        idx_this = idx_unshuffle.view(num_gpus, -1)[gpu_idx]
-
-        return x_gather[idx_this]
 
     def forward(self, img_q, img_k):
         """
@@ -273,16 +228,8 @@ class MocoV2(pl.LightningModule):
         with torch.no_grad():  # no gradient to keys
             self._momentum_update_key_encoder()  # update the key encoder
 
-            # shuffle for making use of BN
-            if self.use_ddp or self.use_ddp2:
-                img_k, idx_unshuffle = self._batch_shuffle_ddp(img_k)
-
             k = self.encoder_k(img_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
-
-            # undo shuffle
-            if self.use_ddp or self.use_ddp2:
-                k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
         # compute logits
         # Einstein sum is more intuitive
@@ -307,34 +254,23 @@ class MocoV2(pl.LightningModule):
         return logits, labels
 
     def training_step(self, batch, batch_idx):
-        # in STL10 we pass in both lab+unl for online ft
-        if self.hparams.datamodule.name == 'stl10':
-            labeled_batch = batch[1]
-            unlabeled_batch = batch[0]
-            batch = unlabeled_batch
-
-        (img_1, img_2), _ = batch
+        img_1, img_2 = batch
 
         output, target = self(img_q=img_1, img_k=img_2)
         loss = F.cross_entropy(output.float(), target.long())
 
         acc1, acc5 = precision_at_k(output, target, top_k=(1, 5))
 
-        log = {
+        result = pl.TrainResult(minimize=loss)
+        result.log_dict({
             'train_loss': loss,
             'train_acc1': acc1,
             'train_acc5': acc5
-        }
-        return {'loss': loss, 'log': log, 'progress_bar': log}
+        },prog_bar=True)
+        return result
 
     def validation_step(self, batch, batch_idx):
-        # in STL10 we pass in both lab+unl for online ft
-        if self.hparams.datamodule.name == 'stl10':
-            labeled_batch = batch[1]
-            unlabeled_batch = batch[0]
-            batch = unlabeled_batch
-
-        (img_1, img_2), labels = batch
+        img_1, img_2 = batch
 
         output, target = self(img_q=img_1, img_k=img_2)
         loss = F.cross_entropy(output, target.long())
@@ -352,59 +288,46 @@ class MocoV2(pl.LightningModule):
         val_loss = mean(outputs, 'val_loss')
         val_acc1 = mean(outputs, 'val_acc1')
         val_acc5 = mean(outputs, 'val_acc5')
-
-        log = {
+        result = pl.EvalResult(checkpoint_on=val_loss)
+        result.log_dict({
             'val_loss': val_loss,
             'val_acc1': val_acc1,
             'val_acc5': val_acc5
-        }
-        return {'val_loss': val_loss, 'log': log, 'progress_bar': log}
+        },prog_bar=True)
+        return result
 
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), self.hparams.learning_rate,
-                                    momentum=self.hparams.momentum,
-                                    weight_decay=self.hparams.weight_decay)
+        #  optimizer = torch.optim.SGD(self.parameters(), self.hparams.lr,
+                                    #  momentum=self.hparams.momentum,
+                                    #  weight_decay=self.hparams.weight_decay)
+        optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr, weight_decay=self.hparams.weight_decay)
         return optimizer
 
     @staticmethod
     def add_model_specific_args(parent_parser):
-        from test_tube import HyperOptArgumentParser
-        parser = HyperOptArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--base_encoder', type=str, default='resnet18')
+        parser = ArgumentParser(parents=[parent_parser], add_help=False, conflict_handler="resolve")
+        parser.add_argument("--exp", type=str, default="pretrain")
+        parser.add_argument("--name", type=str, default="test")
+        parser.add_argument('--base_encoder', type=str, default='mobilenet_v2')
+        parser.add_argument('--root', type=str, default="data/VOCdevkit/VOC2007/JPEGImages")
+        parser.add_argument('--img_size', type=int, default=128)
+        parser.add_argument('--emb_dim', type=int, default=128)
         parser.add_argument('--emb_dim', type=int, default=128)
         parser.add_argument('--num_workers', type=int, default=8)
-        parser.add_argument('--num_negatives', type=int, default=65536)
+        parser.add_argument('--num_negatives', type=int, default=1024) # 65536
         parser.add_argument('--encoder_momentum', type=float, default=0.999)
         parser.add_argument('--softmax_temperature', type=float, default=0.07)
-        parser.add_argument('--learning_rate', type=float, default=0.03)
+        parser.add_argument('--lr', type=float, default=1e-4)
         parser.add_argument('--momentum', type=float, default=0.9)
         parser.add_argument('--weight_decay', type=float, default=1e-4)
-        parser.add_argument('--data_dir', type=str, default='./')
-        parser.add_argument('--batch_size', type=int, default=256)
+        parser.add_argument('--batch_size', type=int, default=128)
+        parser.add_argument('--num_valid', type=int, default=256)
         parser.add_argument('--use_mlp', action='store_true')
-        parser.add_argument('--meta_dir', default='.', type=str, help='path to meta.bin for imagenet')
 
         return parser
 
 
-# utils
-@torch.no_grad()
-def concat_all_gather(tensor):
-    """
-    Performs all_gather operation on the provided tensors.
-    *** Warning ***: torch.distributed.all_gather has no gradient.
-    """
-    tensors_gather = [torch.ones_like(tensor)
-                      for _ in range(torch.distributed.get_world_size())]
-    torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
-
-    output = torch.cat(tensors_gather, dim=0)
-    return output
-
-
-def cli_main():
-    from argparse import ArgumentParser
-
+def main():
     parser = ArgumentParser()
 
     # trainer args
@@ -414,16 +337,24 @@ def cli_main():
     parser = MocoV2.add_model_specific_args(parser)
     args = parser.parse_args()
 
-
-    datamodule = SSLImagenetDataModule.from_argparse_args(args)
-    datamodule.train_transforms = Moco2TrainImagenetTransforms()
-    datamodule.val_transforms = Moco2EvalImagenetTransforms()
-
+    datamodule = SSLImageDataModule(**args.__dict__)
     model = MocoV2(**args.__dict__, datamodule=datamodule)
 
     trainer = pl.Trainer.from_argparse_args(args)
+    if args.name != "test":
+        logger = MLFlowLogger2(experiment_name=args.exp, run_name=args.name)
+        # save source files to mlflow
+        save_dir = f"mlruns/{logger.experiment_id}/{logger.run_id}/artifacts"
+        save_files = [i for i in os.listdir() if '.py' in i]
+        for i in save_files:
+            shutil.copy(i, f'{save_dir}/{i}')
+    else:
+        logger = None
+    trainer.logger = logger
     trainer.fit(model)
 
 
 if __name__ == '__main__':
-    cli_main()
+    main()
+
+# python moco2.py --gpus 4

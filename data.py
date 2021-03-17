@@ -115,7 +115,7 @@ class BedsoreDataModule(LightningDataModule):
             album.HorizontalFlip(p=trans_prob),
             album.ShiftScaleRotate(p=trans_prob),
             album.RandomBrightnessContrast(p=0.3),
-            album.RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
+            #  album.RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
             ToTensor()],
             bbox_params=album.BboxParams(format='pascal_voc', label_fields=['category_ids']
             ))
@@ -139,6 +139,9 @@ class BedsoreDataModule(LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=16, collate_fn=utils.collate_fn)
+
+
+
 
 if __name__ == '__main__':
     dm = BedsoreDataModule('data',1,100,0.5)

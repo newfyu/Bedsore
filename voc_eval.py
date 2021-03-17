@@ -180,7 +180,7 @@ def voc_eval(detpath,
                     R['det'][jmax] = 1
                 else:
                     #  tp[d] = 1. # 重复测量记入tp
-                    fp[d] = 1. # 重复测量不记入fp
+                    fp[d] = 1. # 重复测量不记入tp
             else:
                 fp[d] = 1.
 
