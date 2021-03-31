@@ -20,14 +20,16 @@ def parse_rec(filename):
     for obj in tree.findall('object'):
         obj_struct = {}
         obj_struct['name'] = obj.find('name').text
-#     obj_struct['pose'] = obj.find('pose').text
-#     obj_struct['truncated'] = int(obj.find('truncated').text)
-#     obj_struct['difficult'] = int(obj.find('difficult').text)
+        #     obj_struct['pose'] = obj.find('pose').text
+        #     obj_struct['truncated'] = int(obj.find('truncated').text)
+        #     obj_struct['difficult'] = int(obj.find('difficult').text)
         bbox = obj.find('bndbox')
-        obj_struct['bbox'] = [int(float(bbox.find('xmin').text)),
-                              int(float(bbox.find('ymin').text)),
-                              int(float(bbox.find('xmax').text)),
-                              int(float(bbox.find('ymax').text))]
+        obj_struct['bbox'] = [
+            int(float(bbox.find('xmin').text)),
+            int(float(bbox.find('ymin').text)),
+            int(float(bbox.find('xmax').text)),
+            int(float(bbox.find('ymax').text))
+        ]
         objects.append(obj_struct)
 
     return objects
@@ -99,7 +101,7 @@ def voc_eval(detpath,
     # cachedir caches the annotations in a pickle file
 
     # read dets
-    if isinstance(detpath,str):
+    if isinstance(detpath, str):
         detfile = detpath.format(classname)
         with open(detfile, 'r') as f:
             lines = f.readlines()
@@ -108,10 +110,10 @@ def voc_eval(detpath,
     lines = [line for line in lines if line.split()[0] == classname]
 
     # read list of images
-    if isinstance(imagesetfile,str):
+    if isinstance(imagesetfile, str):
         with open(imagesetfile, 'r') as f:
-            lines = f.readlines()
-        imagenames = [x.strip() for x in lines]
+            imagenames = f.readlines()
+        imagenames = [x.strip() for x in imagenames]
     else:
         imagenames = imagesetfile
 
@@ -128,9 +130,7 @@ def voc_eval(detpath,
         bbox = np.array([x['bbox'] for x in R])
         det = [False] * len(R)
         npos = npos + len(R)
-        class_recs[imagename] = {'bbox': bbox,
-                                 'det': det}
-
+        class_recs[imagename] = {'bbox': bbox, 'det': det}
 
     splitlines = [x.strip().split(' ')[1:] for x in lines]
     image_ids = [x[0] for x in splitlines]
@@ -140,7 +140,7 @@ def voc_eval(detpath,
     nd = len(image_ids)
     tp = np.zeros(nd)
     fp = np.zeros(nd)
-    
+
     if BB.shape[0] > 0:
         # sort by confidence
         sorted_ind = np.argsort(-confidence)
@@ -180,7 +180,7 @@ def voc_eval(detpath,
                     R['det'][jmax] = 1
                 else:
                     #  tp[d] = 1. # 重复测量记入tp
-                    fp[d] = 1. # 重复测量不记入tp
+                    fp[d] = 1.  # 重复测量不记入tp
             else:
                 fp[d] = 1.
 
@@ -195,3 +195,22 @@ def voc_eval(detpath,
     ap = voc_ap(rec, prec, use_07_metric)
 
     return rec, prec, ap
+
+
+if __name__ == "__main__":
+    """below is a example to calculate map scores"""
+    detpath = 'temp/dr3_det_outs.txt'
+    imgsetfile = 'temp/eval_list.txt'
+
+    tissus_name = ['1期', '2期', '3期', '4期', '不可分期', '深部组织损伤']
+    mAP = []
+    for i in tissus_name:
+        ap = voc_eval(detpath,
+                               'data/VOCdevkit/VOC2007/Annotations/{}.xml',
+                               imgsetfile,
+                               i,
+                               ovthresh=0.3,
+                               use_07_metric=True)[-1]
+        print(i, ap)
+        mAP.append(ap)
+    print(sum(mAP) / len(mAP))

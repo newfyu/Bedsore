@@ -9,29 +9,32 @@ import torch
 import torch.nn.functional as F
 import torchvision
 from PIL import ImageFilter
-#  from pl_bolts.datamodules.ssl_imagenet_datamodule import SSLImagenetDataModule
 from pl_bolts.metrics import mean, precision_at_k
 from pl_bolts.transforms.dataset_normalizations import imagenet_normalization
 from torch import nn
 from torchvision import transforms
 from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 import os
 from PIL import Image
 from logger import MLFlowLogger2
 
 
 class SSLImageDataset(torch.utils.data.Dataset):
-
-    def __init__(self, root, transforms, suffix='.jpg', test_list_path='data/VOCdevkit/VOC2007/ImageSets/Main/val.txt'):
+    def __init__(
+            self,
+            root,
+            transforms,
+            suffix='.jpg',
+            test_list_path='data/VOCdevkit/VOC2007/ImageSets/Main/val.txt'):
         self.root = root
         self.transforms = transforms
         self.imglist = [i for i in os.listdir(root) if suffix in i]
-        with open(test_list_path,'r') as f:
+        with open(test_list_path, 'r') as f:
             test_imglist = f.readlines()
-        test_imglist = [i.replace('\n','') +'.jpg' for i in test_imglist]
-        self.imglist = list(set(self.imglist) - set(test_imglist)) # exclude test sample
-            
+        test_imglist = [i.replace('\n', '') + '.jpg' for i in test_imglist]
+        self.imglist = list(set(self.imglist) -
+                            set(test_imglist))  # exclude test sample
 
     def __len__(self):
         return len(self.imglist)
@@ -44,21 +47,36 @@ class SSLImageDataset(torch.utils.data.Dataset):
 
 
 class SSLImageDataModule(LightningDataModule):
-
-    def __init__(self, root, batch_size, num_valid, img_size=400, seed=32, **kwargs):
+    def __init__(self,
+                 root,
+                 batch_size,
+                 num_valid,
+                 img_size=400,
+                 seed=32,
+                 **kwargs):
         super().__init__()
-        ds = SSLImageDataset(root, transforms=Moco2TrainImagenetTransforms(img_size))
+        ds = SSLImageDataset(root,
+                             transforms=Moco2TrainImagenetTransforms(img_size))
         self.batch_size = batch_size
         self.train_ds, self.valid_ds = torch.utils.data.random_split(
-            ds, [len(ds) - num_valid, num_valid], generator=torch.Generator().manual_seed(seed))
+            ds, [len(ds) - num_valid, num_valid],
+            generator=torch.Generator().manual_seed(seed))
         self.valid_ds = copy.deepcopy(self.valid_ds)
-        self.valid_ds.dataset.transforms = Moco2EvalImagenetTransforms(img_size)  # 如果验证集要调整transformer
+        self.valid_ds.dataset.transforms = Moco2EvalImagenetTransforms(
+            img_size)  # 如果验证集要调整transformer
 
     def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.batch_size, shuffle=False, num_workers=8, drop_last=True)
+        return DataLoader(self.train_ds,
+                          batch_size=self.batch_size,
+                          shuffle=False,
+                          num_workers=8,
+                          drop_last=True)
 
     def val_dataloader(self):
-        return DataLoader(self.valid_ds, batch_size=self.batch_size, shuffle=False, num_workers=8)
+        return DataLoader(self.valid_ds,
+                          batch_size=self.batch_size,
+                          shuffle=False,
+                          num_workers=8)
 
 
 class Moco2TrainImagenetTransforms:
@@ -67,14 +85,16 @@ class Moco2TrainImagenetTransforms:
     https://arxiv.org/pdf/2003.04297.pdf
 
     """
-
     def __init__(self, height=128):
         # image augmentation functions
         self.train_transform = transforms.Compose([
             transforms.RandomResizedCrop(height, scale=(0.2, 1.)),
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-            ], p=0.8),
+            transforms.RandomApply(
+                [
+                    transforms.ColorJitter(0.4, 0.4, 0.4,
+                                           0.1)  # not strengthened
+                ],
+                p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([GaussianBlur([.1, 2.])], p=0.5),
             transforms.RandomHorizontalFlip(),
@@ -94,7 +114,6 @@ class Moco2EvalImagenetTransforms:
     https://arxiv.org/pdf/2003.04297.pdf
 
     """
-
     def __init__(self, height=128):
         self.test_transform = transforms.Compose([
             transforms.Resize(height + 32),
@@ -111,7 +130,6 @@ class Moco2EvalImagenetTransforms:
 
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
-
     def __init__(self, sigma=(0.1, 2.0)):
         self.sigma = sigma
 
@@ -122,7 +140,6 @@ class GaussianBlur(object):
 
 
 class MocoV2(pl.LightningModule):
-
     def __init__(self,
                  base_encoder: Union[str, torch.nn.Module] = 'resnet18',
                  emb_dim: int = 128,
@@ -136,7 +153,8 @@ class MocoV2(pl.LightningModule):
                  batch_size: int = 256,
                  use_mlp: bool = False,
                  num_workers: int = 8,
-                 *args, **kwargs):
+                 *args,
+                 **kwargs):
         """
         Args:
             base_encoder: torchvision model name or torch.nn.Module
@@ -163,10 +181,13 @@ class MocoV2(pl.LightningModule):
 
         if use_mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
-            self.encoder_q.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_q.fc)
-            self.encoder_k.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_k.fc)
+            self.encoder_q.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp),
+                                              nn.ReLU(), self.encoder_q.fc)
+            self.encoder_k.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp),
+                                              nn.ReLU(), self.encoder_k.fc)
 
-        for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
+        for param_q, param_k in zip(self.encoder_q.parameters(),
+                                    self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
 
@@ -193,7 +214,8 @@ class MocoV2(pl.LightningModule):
         """
         Momentum update of the key encoder
         """
-        for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
+        for param_q, param_k in zip(self.encoder_q.parameters(),
+                                    self.encoder_k.parameters()):
             em = self.hparams.encoder_momentum
             param_k.data = param_k.data * em + param_q.data * (1. - em)
 
@@ -262,11 +284,13 @@ class MocoV2(pl.LightningModule):
         acc1, acc5 = precision_at_k(output, target, top_k=(1, 5))
 
         result = pl.TrainResult(minimize=loss)
-        result.log_dict({
-            'train_loss': loss,
-            'train_acc1': acc1,
-            'train_acc5': acc5
-        },prog_bar=True)
+        result.log_dict(
+            {
+                'train_loss': loss,
+                'train_acc1': acc1,
+                'train_acc5': acc5
+            },
+            prog_bar=True)
         return result
 
     def validation_step(self, batch, batch_idx):
@@ -277,11 +301,7 @@ class MocoV2(pl.LightningModule):
 
         acc1, acc5 = precision_at_k(output, target, top_k=(1, 5))
 
-        results = {
-            'val_loss': loss,
-            'val_acc1': acc1,
-            'val_acc5': acc5
-        }
+        results = {'val_loss': loss, 'val_acc1': acc1, 'val_acc5': acc5}
         return results
 
     def validation_epoch_end(self, outputs):
@@ -289,32 +309,40 @@ class MocoV2(pl.LightningModule):
         val_acc1 = mean(outputs, 'val_acc1')
         val_acc5 = mean(outputs, 'val_acc5')
         result = pl.EvalResult(checkpoint_on=val_loss)
-        result.log_dict({
-            'val_loss': val_loss,
-            'val_acc1': val_acc1,
-            'val_acc5': val_acc5
-        },prog_bar=True)
+        result.log_dict(
+            {
+                'val_loss': val_loss,
+                'val_acc1': val_acc1,
+                'val_acc5': val_acc5
+            },
+            prog_bar=True)
         return result
 
     def configure_optimizers(self):
         #  optimizer = torch.optim.SGD(self.parameters(), self.hparams.lr,
-                                    #  momentum=self.hparams.momentum,
-                                    #  weight_decay=self.hparams.weight_decay)
-        optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        #  momentum=self.hparams.momentum,
+        #  weight_decay=self.hparams.weight_decay)
+        optimizer = torch.optim.Adam(self.parameters(),
+                                     self.hparams.lr,
+                                     weight_decay=self.hparams.weight_decay)
         return optimizer
 
     @staticmethod
     def add_model_specific_args(parent_parser):
-        parser = ArgumentParser(parents=[parent_parser], add_help=False, conflict_handler="resolve")
-        parser.add_argument("--exp", type=str, default="pretrain")
+        parser = ArgumentParser(parents=[parent_parser],
+                                add_help=False,
+                                conflict_handler="resolve")
+        parser.add_argument("--exp", type=str, default="MocoV2 pretrain")
         parser.add_argument("--name", type=str, default="test")
         parser.add_argument('--base_encoder', type=str, default='mobilenet_v2')
-        parser.add_argument('--root', type=str, default="data/VOCdevkit/VOC2007/JPEGImages")
+        parser.add_argument('--root',
+                            type=str,
+                            default="data/VOCdevkit/VOC2007/JPEGImages")
         parser.add_argument('--img_size', type=int, default=128)
         parser.add_argument('--emb_dim', type=int, default=128)
         parser.add_argument('--emb_dim', type=int, default=128)
         parser.add_argument('--num_workers', type=int, default=8)
-        parser.add_argument('--num_negatives', type=int, default=1024) # 65536
+        parser.add_argument('--num_negatives', type=int, default=1024)  # 65536
         parser.add_argument('--encoder_momentum', type=float, default=0.999)
         parser.add_argument('--softmax_temperature', type=float, default=0.07)
         parser.add_argument('--lr', type=float, default=1e-4)

@@ -5,7 +5,7 @@ sys.path.append("/home/zrway/Projects/Bedsore")
 
 import data
 import albumentations as A
-from data import BedsoreDataset
+from data import BedsoreDataset,BedsoreDataModule
 from torchvision import transforms as T
 import numpy as np
 from albumentations.pytorch import ToTensorV2,ToTensor
@@ -25,10 +25,11 @@ atfmc = A.Compose([
     ToTensor(),
     ],bbox_params=A.BboxParams(format='pascal_voc', label_fields=['category_ids']))
 # atfmc = None
+dm = BedsoreDataModule('data',1,100,0.5)
+ds = dm.test_ds # only test image
+#  ds = BedsoreDataset('data', transforms=atfmc) # for all image
 
-ds = BedsoreDataset('data', transforms=atfmc)
-
-SZ = 256
+SZ = 512
 ry = Image.new("RGB",(SZ,SZ),(255,0,0))
 fr = Image.new("RGB",(SZ,SZ),(255,255,0))
 hs = Image.new("RGB",(SZ,SZ),(0,0,255))

@@ -7,3 +7,6 @@ mlruns
 checkpoints
 temp
 check_image
+.vim
+.vscode
+task_测试题*
