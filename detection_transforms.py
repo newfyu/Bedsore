@@ -8,16 +8,6 @@ from collections import Iterable
 from PIL import ImageFilter
 
 
-def _flip_coco_person_keypoints(kps, width):
-    flip_inds = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
-    flipped_data = kps[:, flip_inds]
-    flipped_data[..., 0] = width - flipped_data[..., 0]
-    # Maintain COCO convention that if visibility == 0, then x, y = 0
-    inds = flipped_data[..., 2] == 0
-    flipped_data[inds] = 0
-    return flipped_data
-
-
 class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms  # list
@@ -74,21 +64,27 @@ class RandomRotate(object):
             boxes2 = boxes.clone()
             if angle == 90:
                 image = T.functional.rotate(image, 90, expand=True)
-                target['masks'] = T.functional.rotate(target['masks'], 90, expand=True)
+                target['masks'] = T.functional.rotate(target['masks'],
+                                                      90,
+                                                      expand=True)
                 boxes[:, 0] = boxes2[:, 1]
                 boxes[:, 1] = W - boxes2[:, 2]
                 boxes[:, 2] = boxes2[:, 3]
                 boxes[:, 3] = W - boxes2[:, 0]
             if angle == 180:
                 image = T.functional.rotate(image, 180, expand=True)
-                target['masks'] = T.functional.rotate(target['masks'], 180, expand=True)
+                target['masks'] = T.functional.rotate(target['masks'],
+                                                      180,
+                                                      expand=True)
                 boxes[:, 0] = W - boxes2[:, 2]
                 boxes[:, 1] = H - boxes2[:, 3]
                 boxes[:, 2] = W - boxes2[:, 0]
                 boxes[:, 3] = H - boxes2[:, 1]
             if angle == 270:
                 image = T.functional.rotate(image, 270, expand=True)
-                target['masks'] = T.functional.rotate(target['masks'], 270, expand=True)
+                target['masks'] = T.functional.rotate(target['masks'],
+                                                      270,
+                                                      expand=True)
                 boxes[:, 0] = H - boxes2[:, 3]
                 boxes[:, 1] = boxes2[:, 0]
                 boxes[:, 2] = H - boxes2[:, 1]
@@ -105,8 +101,11 @@ class RandomResize(object):
     def __call__(self, image, target):
         if random.random() < self.prob:
             W, H = image.size
-            image = T.functional.resize(image, (int(H * self.h_scale), int(W * self.w_scale)))
-            target['masks'] = T.functional.resize(target['masks'], (int(H * self.h_scale), int(W * self.w_scale)))
+            image = T.functional.resize(
+                image, (int(H * self.h_scale), int(W * self.w_scale)))
+            target['masks'] = T.functional.resize(
+                target['masks'],
+                (int(H * self.h_scale), int(W * self.w_scale)))
             boxes = target['boxes']
             boxes[:, [0, 2]] *= self.w_scale
             boxes[:, [1, 3]] *= self.h_scale
@@ -132,6 +131,7 @@ class RandomErasing(object):
             image = T.transforms.RandomErasing(scale=(0.02, 0.05), p=1)(image)
         return image, target
 
+
 class RandomGaussianBlur(object):
     def __init__(self, sigma=(0.1, 2.0), prob=0.5):
         self.prob = prob
@@ -142,6 +142,7 @@ class RandomGaussianBlur(object):
             sigma = random.uniform(self.sigma[0], self.sigma[1])
             image = image.filter(ImageFilter.GaussianBlur(radius=sigma))
         return image, target
+
 
 class RandomCrop(object):
     def __init__(self, prob=0.5):
@@ -163,7 +164,8 @@ class RandomCrop(object):
             target['boxes'][:, 1] -= b
             target['boxes'][:, 3] -= b
             image = T.functional.crop(image, b, a, d - b, c - a)
-            target['masks'] = T.functional.crop(target['masks'], b, a, d - b, c - a)
+            target['masks'] = T.functional.crop(target['masks'], b, a, d - b,
+                                                c - a)
         return image, target
 
 
@@ -172,5 +174,3 @@ class ToTensor(object):
         image = F.to_tensor(image)
         #  image = imagenet_normalization()(image)
         return image, target
-
-
