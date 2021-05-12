@@ -77,7 +77,6 @@ class MyFasterRCNN(pl.LightningModule):
                     box_roi_pool=roi_pooler,
                     mask_roi_pool=mask_roi_pooler,
                 )
-                #  import ipdb; ipdb.set_trace()
             else:
                 self.net = maskrcnn_resnet50_fpn(
                     pretrained=True,
@@ -100,7 +99,7 @@ class MyFasterRCNN(pl.LightningModule):
         loss_dict = self(images, targets)
         loss = sum(loss for loss in loss_dict.values())
         result = pl.TrainResult(minimize=loss)
-        result.log_dict({"loss/train_loss": loss}, prog_bar=True)
+        result.log_dict({"train_loss": loss}, prog_bar=True)
         return result
 
     #  def validation_step(self, batch, batch_idx):
@@ -149,7 +148,7 @@ class MyFasterRCNN(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         mAP, class_ap = self.cal_ap(outputs)
         result = pl.EvalResult(checkpoint_on=-torch.FloatTensor([mAP]))
-        result.log_dict({"valid_map": mAP})
+        result.log_dict({"valid_map": mAP}, prog_bar=True)
         return result
 
     @torch.no_grad()
