@@ -15,7 +15,7 @@ from data import BedsoreDataModule
 from logger import MLFlowLogger2
 from torchvision.models.detection import MaskRCNN
 from torchvision.models.detection.anchor_utils import AnchorGenerator
-from moco2 import *
+#  from moco2 import *
 
 
 class MyFasterRCNN(pl.LightningModule):
@@ -185,6 +185,7 @@ class MyFasterRCNN(pl.LightningModule):
         parser.add_argument("--num_classes", type=int, default=10)
         parser.add_argument("--batch_size", type=int, default=3)
         parser.add_argument("--num_valid", type=int, default=100)
+        parser.add_argument("--num_workers", type=int, default=8)
         parser.add_argument("--seed", type=int, default=32)
         parser.add_argument("--data_root", type=str, default="data")
         parser.add_argument("--distributed_backend", type=str, default="dp")
@@ -209,6 +210,7 @@ def main():
                            args.batch_size,
                            args.num_valid,
                            args.trans_prob,
+                           args.num_workers,
                            seed=args.seed)
     trainer = Trainer.from_argparse_args(args)
 

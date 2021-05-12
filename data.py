@@ -122,11 +122,18 @@ class BedsoreDataset(object):
 
 
 class BedsoreDataModule(LightningDataModule):
-    def __init__(self, root, batch_size, num_valid, trans_prob, seed=32):
+    def __init__(self,
+                 root,
+                 batch_size,
+                 num_valid,
+                 trans_prob,
+                 num_workers=8,
+                 seed=32):
         super().__init__()
         self.root = root
         self.batch_size = batch_size
         self.seed = seed
+        self.num_workers = num_workers
 
         tfmc_train = album.Compose(
             [
@@ -162,21 +169,21 @@ class BedsoreDataModule(LightningDataModule):
         return DataLoader(self.train_ds,
                           batch_size=self.batch_size,
                           shuffle=True,
-                          num_workers=16,
+                          num_workers=self.num_workers,
                           collate_fn=utils.collate_fn)
 
     def val_dataloader(self):
         return DataLoader(self.valid_ds,
                           batch_size=1,
                           shuffle=False,
-                          num_workers=16,
+                          num_workers=self.num_workers,
                           collate_fn=utils.collate_fn)
 
     def test_dataloader(self):
         return DataLoader(self.test_ds,
                           batch_size=1,
                           shuffle=False,
-                          num_workers=16,
+                          num_workers=self.num_workers,
                           collate_fn=utils.collate_fn)
 
 
