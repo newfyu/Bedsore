@@ -1,5 +1,6 @@
 bak
 data
+lmdb
 __pycache__
 lightning_logs
 mlruns
