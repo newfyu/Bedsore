@@ -354,7 +354,7 @@ class BedsoreLMDBDataModule(LightningDataModule):
                                     chunk_num=chunk_num)
 
         self.valid_ds = BedsoreLMDB(self.root,
-                                    transforms=tfmc_train,
+                                    transforms=tfmc_valid,
                                     image_set='train',
                                     val=True,
                                     chunk_id=chunk_id,
