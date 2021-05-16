@@ -11,17 +11,20 @@ from PIL import Image
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
 import albumentations as album
-from albumentations.pytorch import ToTensorV2, ToTensor
+from albumentations.pytorch import ToTensor
+import lmdb
 
 import utils
-#  from detection_transforms import (Compose, RandomColorJitter, RandomCrop,
-#  RandomErasing, RandomHorizontalFlip,
-#  RandomResize, RandomRotate,
-#  RandomGaussianBlur, RandomVerticalFlip, ToTensor)
 
 
-class BedsoreDataset_lmdb(object):
-    def __init__(self, root='data', transforms=None, image_set='train'):
+class BedsoreLMDB(object):
+    def __init__(self,
+                 root='data',
+                 transforms=None,
+                 image_set='train',
+                 val=False,
+                 chunk_id=0,
+                 chunk_num=5):
         self.root = root
         self.transforms = transforms
         self.data = torchvision.datasets.VOCDetection(root,
@@ -35,36 +38,49 @@ class BedsoreDataset_lmdb(object):
             '不可分期': 5,
             '深部组织损伤': 6
         }
-        env = lmdb.open('data/arr_lmdb')
+
+        if chunk_num > 0:  # 如果是训练集，划分一个验证集出来
+            torch.manual_seed(32)
+            sample_id = torch.randperm(len(self.data))
+            valid_id = sample_id.chunk(chunk_num)[chunk_id].tolist()
+            train_id = list(set(sample_id.tolist()) - set(valid_id))
+            if val == True:
+                self.sample_id = valid_id
+            else:
+                self.sample_id = train_id
+        else:
+            self.sample_id = list(range(len(self.data)))
+
+        env = lmdb.open(f'{self.root}/arr_lmdb')
         self.txn = env.begin(write=False)
-        
 
     def __getitem__(self, idx):
-#         image = self.data[idx][0]#PIL
-        
-        anno = self.txn.get(f'anno_{idx}'.encode()) # sub self.data[idx][1]
+        if idx >= len(self.sample_id):
+            raise StopIteration
+        idx = self.sample_id[idx]
+        anno = self.txn.get(f'anno_{idx}'.encode())  # sub self.data[idx][1]
         anno = eval(anno)
         w = anno['annotation']['size']['width']
         h = anno['annotation']['size']['height']
-        
-        image = self.txn.get(f'data_{idx}'.encode()) 
-        image = np.frombuffer(image, dtype=np.uint8)#arr
-        image = image.reshape(int(h),int(w),3)
+
+        image = self.txn.get(f'data_{idx}'.encode())
+        image = np.frombuffer(image, dtype=np.uint8)  #arr
+        image = image.reshape(int(h), int(w), 3)
 
         boxes, labels = [], []
         image_id = torch.tensor([idx])
 
         fname = anno['annotation']['filename'][:-4]
-        
+
         mask = self.txn.get(f'mask_{idx}'.encode())
         if mask is not None:
             mask = np.frombuffer(mask, dtype=np.uint8)
-            mask = mask.reshape(int(h),int(w))
+            mask = mask.reshape(int(h), int(w))
             obj_ids = np.unique(mask)[1:]
             masks = mask == obj_ids[:, None, None]
             mask_class = self.txn.get(f'mask_class_{idx}'.encode())
             mask_class = np.frombuffer(mask_class, dtype=np.uint8)
-            mask_class = mask_class.reshape(int(h),int(w))
+            mask_class = mask_class.reshape(int(h), int(w))
             mask_class = masks * mask_class
             mask_label = mask_class.max(1).max(1).tolist()
             ccc = {
@@ -94,12 +110,11 @@ class BedsoreDataset_lmdb(object):
                 boxes.append(bbox)
                 labels.append(self.label_dict[i['name']])
         else:
-            bbox = list(
-                anno['annotation']['object']['bndbox'].values())
+            bbox = list(anno['annotation']['object']['bndbox'].values())
             bbox = list(map(float, bbox))
             boxes.append(bbox)
-            labels.append(self.label_dict[anno['annotation']
-                                          ['object']['name']])
+            labels.append(
+                self.label_dict[anno['annotation']['object']['name']])
 
         pre_masks = torch.zeros(len(labels), image.shape[0], image.shape[1])
         labels = labels + mask_label
@@ -118,11 +133,11 @@ class BedsoreDataset_lmdb(object):
             target['masks'] = pre_masks
 
         if self.transforms is not None:
-            transformed = self.transforms(image=image,
-                                          bboxes=target['boxes'],
-                                          mask=target['masks'].permute(
-                                              1, 2, 0).numpy(),
-                                          category_ids=target['labels'])
+            transformed = self.transforms(
+                image=image,
+                bboxes=target['boxes'],
+                mask=target['masks'].permute(1, 2, 0).numpy(),
+                category_ids=target['labels'].tolist())
             image = transformed['image']
             target['boxes'] = torch.as_tensor(transformed['bboxes'],
                                               dtype=torch.float32)
@@ -131,7 +146,7 @@ class BedsoreDataset_lmdb(object):
         return image, target
 
     def __len__(self):
-        return len(self.data)
+        return len(self.sample_id)
 
 
 class BedsoreDataset(object):
@@ -217,19 +232,18 @@ class BedsoreDataset(object):
             target['masks'] = masks
         else:
             target['masks'] = pre_masks
-
         if self.transforms is not None:
-            transformed = self.transforms(image=np.array(image),
-                                          bboxes=target['boxes'],
-                                          mask=target['masks'].permute(
-                                              1, 2, 0).numpy(),
-                                          category_ids=target['labels'])
-            image = transformed['image']
+            transformed = self.transforms(
+                image=np.array(image),
+                bboxes=target['boxes'].tolist(),
+                mask=target['masks'].permute(1, 2, 0).numpy(),
+                category_ids=target['labels'].tolist())
+
             target['boxes'] = torch.as_tensor(transformed['bboxes'],
                                               dtype=torch.float32)
             target['masks'] = transformed['mask'][0].permute(2, 0, 1)
 
-        return image, target
+            return image, target
 
     def __len__(self):
         return len(self.data)
@@ -251,10 +265,8 @@ class BedsoreDataModule(LightningDataModule):
 
         tfmc_train = album.Compose(
             [
-                #  album.RandomScale(p=trans_prob, scale_limit=0.5),
-                #  album.RandomShadow(p=trans_prob),
                 album.RandomSizedBBoxSafeCrop(
-                    800, 800, p=0.5, erosion_rate=0.2),
+                    800, 800, p=trans_prob, erosion_rate=0.2),
                 album.HorizontalFlip(p=trans_prob),
                 album.VerticalFlip(p=trans_prob),
                 album.ShiftScaleRotate(p=trans_prob, rotate_limit=90),
@@ -300,14 +312,14 @@ class BedsoreDataModule(LightningDataModule):
                           num_workers=self.num_workers,
                           collate_fn=utils.collate_fn)
 
-    
-    
-class BedsoreDataModuleLMDB(LightningDataModule):
+
+class BedsoreLMDBDataModule(LightningDataModule):
     def __init__(self,
                  root,
                  batch_size,
-                 num_valid,
                  trans_prob,
+                 chunk_num,
+                 chunk_id,
                  num_workers=8,
                  seed=32):
         super().__init__()
@@ -318,8 +330,6 @@ class BedsoreDataModuleLMDB(LightningDataModule):
 
         tfmc_train = album.Compose(
             [
-                #  album.RandomScale(p=trans_prob, scale_limit=0.5),
-                #  album.RandomShadow(p=trans_prob),
                 album.RandomSizedBBoxSafeCrop(
                     800, 800, p=0.5, erosion_rate=0.2),
                 album.HorizontalFlip(p=trans_prob),
@@ -336,15 +346,24 @@ class BedsoreDataModuleLMDB(LightningDataModule):
                                        format='pascal_voc',
                                        label_fields=['category_ids']))
 
-        ds = BedsoreDataset_lmdb(self.root, transforms=tfmc_train)
-        self.train_ds, self.valid_ds = torch.utils.data.random_split(
-            ds, [len(ds) - num_valid, num_valid],
-            generator=torch.Generator().manual_seed(self.seed))
-        self.valid_ds = copy.deepcopy(self.valid_ds)
-        self.valid_ds.dataset.transforms = tfmc_valid  # 如果验证集要调整transformer
-        self.test_ds = BedsoreDataset(self.root,
+        self.train_ds = BedsoreLMDB(self.root,
+                                    transforms=tfmc_train,
+                                    image_set='train',
+                                    val=False,
+                                    chunk_id=chunk_id,
+                                    chunk_num=chunk_num)
+
+        self.valid_ds = BedsoreLMDB(self.root,
+                                    transforms=tfmc_train,
+                                    image_set='train',
+                                    val=True,
+                                    chunk_id=chunk_id,
+                                    chunk_num=chunk_num)
+
+        self.test_ds = BedsoreLMDB(self.root,
                                       transforms=tfmc_valid,
-                                      image_set='val')
+                                      image_set='val',
+                                      chunk_num=0)
 
     def train_dataloader(self):
         return DataLoader(self.train_ds,
@@ -365,11 +384,6 @@ class BedsoreDataModuleLMDB(LightningDataModule):
                           batch_size=1,
                           shuffle=False,
                           num_workers=self.num_workers,
-                          collate_fn=utils.collate_fn)    
+                          collate_fn=utils.collate_fn)
 
 
-if __name__ == '__main__':
-    dm = BedsoreDataModule('data', 1, 100, 0.5)
-    import ipdb
-    ipdb.set_trace()
-    pass

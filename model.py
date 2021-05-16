@@ -11,11 +11,10 @@ from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 
 import utils
 import voc_eval
-from data import BedsoreDataModule
+from data import BedsoreDataModule, BedsoreLMDBDataModule
 from logger import MLFlowLogger2
 from torchvision.models.detection import MaskRCNN
 from torchvision.models.detection.anchor_utils import AnchorGenerator
-#  from moco2 import *
 
 
 class MyFasterRCNN(pl.LightningModule):
@@ -180,6 +179,8 @@ class MyFasterRCNN(pl.LightningModule):
                                 conflict_handler="resolve")
         parser.add_argument("--exp", type=str, default="Default")
         parser.add_argument("--name", type=str, default="test")
+        parser.add_argument("--chunk_num", type=int, default=10)
+        parser.add_argument("--chunk_id", type=int, default=0)
         parser.add_argument("--lr", type=float, default=1e-4)
         parser.add_argument("--num_classes", type=int, default=10)
         parser.add_argument("--batch_size", type=int, default=3)
@@ -205,12 +206,13 @@ def main():
     args = parser.parse_args()
     seed_everything(args.seed)
     model = MyFasterRCNN(args)
-    dm = BedsoreDataModule(args.data_root,
-                           args.batch_size,
-                           args.num_valid,
-                           args.trans_prob,
-                           args.num_workers,
-                           seed=args.seed)
+    dm = BedsoreLMDBDataModule(root=args.data_root,
+                               batch_size=args.batch_size,
+                               trans_prob=args.trans_prob,
+                               chunk_num=args.chunk_num,
+                               chunk_id=args.chunk_id,
+                               num_workers=args.num_workers,
+                               seed=args.seed)
     trainer = Trainer.from_argparse_args(args)
 
     if args.test_ckpt != "":  # test
