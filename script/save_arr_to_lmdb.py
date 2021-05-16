@@ -17,8 +17,8 @@ if __name__ == "__main__":
                                            image_set='trainval')
     # make byte lmdb
     env = lmdb.open(LMDB_NAME, map_size=int(3e10))
-    with env.begin(write=True) as txn:
-        for i, d in enumerate(tqdm(ds)):
+    for i, d in enumerate(tqdm(ds)):
+        with env.begin(write=True) as txn:
             fname = d[1]['annotation']['filename'][:-4]
             mask_class_path = f'data/VOCdevkit/VOC2007/SegmentationClass/{fname}.png'
             mask_object_path = f'data/VOCdevkit/VOC2007/SegmentationObject/{fname}.png'
