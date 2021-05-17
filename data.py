@@ -239,6 +239,7 @@ class BedsoreDataset(object):
                 mask=target['masks'].permute(1, 2, 0).numpy(),
                 category_ids=target['labels'].tolist())
 
+            image = transformed['image']
             target['boxes'] = torch.as_tensor(transformed['bboxes'],
                                               dtype=torch.float32)
             target['masks'] = transformed['mask'][0].permute(2, 0, 1)

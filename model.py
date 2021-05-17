@@ -183,7 +183,7 @@ class MyFasterRCNN(pl.LightningModule):
         parser.add_argument("--chunk_id", type=int, default=0)
         parser.add_argument("--lr", type=float, default=1e-4)
         parser.add_argument("--num_classes", type=int, default=10)
-        parser.add_argument("--batch_size", type=int, default=5)
+        parser.add_argument("--batch_size", type=int, default=4)
         parser.add_argument("--num_valid", type=int, default=100)
         parser.add_argument("--num_workers", type=int, default=8)
         parser.add_argument("--seed", type=int, default=32)
