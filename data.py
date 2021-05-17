@@ -328,19 +328,17 @@ class BedsoreLMDBDataModule(LightningDataModule):
         self.seed = seed
         self.num_workers = num_workers
 
-        tfmc_train = album.Compose(
-            [
-                album.RandomSizedBBoxSafeCrop(
-                    800, 800, p=0.5, erosion_rate=0.2),
-                album.HorizontalFlip(p=trans_prob),
-                album.VerticalFlip(p=trans_prob),
-                album.ShiftScaleRotate(p=trans_prob, rotate_limit=90),
-                album.RandomBrightnessContrast(p=trans_prob),
-                #  album.RGBShift(r_shift_limit=30, g_shift_limit=30, b_shift_limit=30, p=0.3),
-                ToTensor()
-            ],
-            bbox_params=album.BboxParams(format='pascal_voc',
-                                         label_fields=['category_ids']))
+        tfmc_train = album.Compose([
+            album.RandomSizedBBoxSafeCrop(800, 800, p=0.5, erosion_rate=0.1),
+            album.HorizontalFlip(p=trans_prob),
+            album.VerticalFlip(p=trans_prob),
+            album.ShiftScaleRotate(p=trans_prob, rotate_limit=90),
+            album.RandomBrightnessContrast(p=trans_prob),
+            ToTensor()
+        ],
+                                   bbox_params=album.BboxParams(
+                                       format='pascal_voc',
+                                       label_fields=['category_ids']))
         tfmc_valid = album.Compose([ToTensor()],
                                    bbox_params=album.BboxParams(
                                        format='pascal_voc',
@@ -361,14 +359,15 @@ class BedsoreLMDBDataModule(LightningDataModule):
                                     chunk_num=chunk_num)
 
         self.test_ds = BedsoreLMDB(self.root,
-                                      transforms=tfmc_valid,
-                                      image_set='val',
-                                      chunk_num=0)
+                                   transforms=tfmc_valid,
+                                   image_set='val',
+                                   chunk_num=0)
 
     def train_dataloader(self):
         return DataLoader(self.train_ds,
                           batch_size=self.batch_size,
                           shuffle=True,
+                          drop_last=True,
                           num_workers=self.num_workers,
                           collate_fn=utils.collate_fn)
 
@@ -385,5 +384,3 @@ class BedsoreLMDBDataModule(LightningDataModule):
                           shuffle=False,
                           num_workers=self.num_workers,
                           collate_fn=utils.collate_fn)
-
-

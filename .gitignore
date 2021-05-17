@@ -10,4 +10,6 @@ temp
 check_image
 .vim
 .vscode
+*.tar
+*.zip
 task_测试题*

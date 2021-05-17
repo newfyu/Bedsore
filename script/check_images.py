@@ -1,11 +1,12 @@
 import os
 import sys
+import shutil
 
 sys.path.append(os.getcwd())
 
 import data
 import albumentations as A
-from data import BedsoreDataset, BedsoreDataModule
+from data import BedsoreDataset, BedsoreDataModule, BedsoreLMDB
 from torchvision import transforms as T
 import numpy as np
 from albumentations.pytorch import ToTensorV2, ToTensor
@@ -29,10 +30,14 @@ atfmc = A.Compose(
 # atfmc = None
 #  dm = BedsoreDataModule('data', 1, 100, 0.5)
 #  ds = dm.test_ds  # only test image
-ds = BedsoreDataset('data', transforms=atfmc,
-                    image_set='trainval')  # for all image
+ds = BedsoreLMDB('data',
+                 transforms=atfmc,
+                 image_set='trainval',
+                 val=False,
+                 chunk_id=0,
+                 chunk_num=0)  # for all image
 
-SZ = 256
+SZ = 512
 ry = Image.new("RGB", (SZ, SZ), (255, 0, 0))
 fr = Image.new("RGB", (SZ, SZ), (255, 255, 0))
 hs = Image.new("RGB", (SZ, SZ), (0, 0, 255))
@@ -40,7 +45,7 @@ tissue = {7: hs, 8: fr, 9: ry}
 
 out_dir = 'check_image'
 if os.path.exists(out_dir):
-    os.removedirs(out_dir)
+    shutil.rmtree(out_dir)
 os.mkdir(out_dir)
 
 for i in tqdm(range(0, len(ds))):
