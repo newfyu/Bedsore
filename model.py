@@ -159,15 +159,15 @@ class MyFasterRCNN(pl.LightningModule):
         result.log_dict({"test_mAP": mAP})
         return result
 
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-        return optimizer
-
     #  def configure_optimizers(self):
         #  optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-        #  optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
-        #  scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50], gamma=0.1, verbose=False)
-        #  return [optimizer], [scheduler]
+        #  return optimizer
+
+    def configure_optimizers(self):
+        #  optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50], gamma=0.1, verbose=False)
+        return [optimizer], [scheduler]
 
     @staticmethod
     def add_model_specific_args(parent_parser):

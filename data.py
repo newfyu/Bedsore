@@ -64,7 +64,7 @@ class BedsoreLMDB(object):
         h = anno['annotation']['size']['height']
 
         image = self.txn.get(f'data_{idx}'.encode())
-        image = np.frombuffer(image, dtype=np.uint8)  #arr
+        image = np.frombuffer(image, dtype=np.uint8)  # arr
         image = image.reshape(int(h), int(w), 3)
 
         boxes, labels = [], []
@@ -330,16 +330,16 @@ class BedsoreLMDBDataModule(LightningDataModule):
         self.num_workers = num_workers
 
         tfmc_train = album.Compose([
-            album.RandomSizedBBoxSafeCrop(800, 800, p=0.5, erosion_rate=0.1),
+            album.RandomSizedBBoxSafeCrop(800, 800, p=trans_prob, erosion_rate=0.1),
             album.HorizontalFlip(p=trans_prob),
             album.VerticalFlip(p=trans_prob),
-            album.ShiftScaleRotate(p=trans_prob, rotate_limit=90),
+            album.ShiftScaleRotate(shift_limit=0, scale_limit=0, p=trans_prob, rotate_limit=90),
             album.RandomBrightnessContrast(p=trans_prob),
             ToTensor()
         ],
-                                   bbox_params=album.BboxParams(
-                                       format='pascal_voc',
-                                       label_fields=['category_ids']))
+            bbox_params=album.BboxParams(
+            format='pascal_voc',
+            label_fields=['category_ids']))
         tfmc_valid = album.Compose([ToTensor()],
                                    bbox_params=album.BboxParams(
                                        format='pascal_voc',
