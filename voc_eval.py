@@ -206,11 +206,11 @@ if __name__ == "__main__":
     mAP = []
     for i in tissus_name:
         ap = voc_eval(detpath,
-                               'data/VOCdevkit/VOC2007/Annotations/{}.xml',
-                               imgsetfile,
-                               i,
-                               ovthresh=0.3,
-                               use_07_metric=True)[-1]
+                      'data/VOCdevkit/VOC2007/Annotations/{}.xml',
+                      imgsetfile,
+                      i,
+                      ovthresh=0.3,
+                      use_07_metric=True)[-1]
         print(i, ap)
         mAP.append(ap)
     print(sum(mAP) / len(mAP))

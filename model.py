@@ -126,6 +126,15 @@ class MyFasterRCNN(pl.LightningModule):
         mAP = sum(mAP) / len(mAP)
         return mAP, class_ap
 
+    #  def validation_step(self, batch, batch_idx):
+        #  self.net.train()  # net output loss when set train
+        #  images, targets = batch
+        #  loss_dict = self(images, targets)
+        #  loss = sum(loss for loss in loss_dict.values())
+        #  result = pl.EvalResult(checkpoint_on=loss)
+        #  result.log_dict({'loss/valid_loss': loss}, prog_bar=True)
+        #  return result
+
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
         self.net.eval()
@@ -159,24 +168,25 @@ class MyFasterRCNN(pl.LightningModule):
         result.log_dict({"test_mAP": mAP})
         return result
 
-    #  def configure_optimizers(self):
-        #  optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-        #  return optimizer
-
     def configure_optimizers(self):
-        #  optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50], gamma=0.1, verbose=False)
-        return [optimizer], [scheduler]
+        #  optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        return optimizer
+
+    #  def configure_optimizers(self):
+        #  #  optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        #  optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
+        #  scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [50, 100, 150, 200], gamma=0.1, verbose=True)
+        #  return [optimizer], [scheduler]
 
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = ArgumentParser(parents=[parent_parser],
                                 add_help=False,
                                 conflict_handler="resolve")
-        parser.add_argument("--exp", type=str, default="Default")
+        parser.add_argument("--exp", type=str, default="BedsoreV1")
         parser.add_argument("--name", type=str, default="test")
-        parser.add_argument("--chunk_num", type=int, default=10)
+        parser.add_argument("--chunk_num", type=int, default=5)
         parser.add_argument("--chunk_id", type=int, default=0)
         parser.add_argument("--lr", type=float, default=1e-4)
         parser.add_argument("--wd", type=str, default=1e-5)
@@ -184,10 +194,10 @@ class MyFasterRCNN(pl.LightningModule):
         parser.add_argument("--batch_size", type=int, default=4)
         parser.add_argument("--num_valid", type=int, default=100)
         parser.add_argument("--num_workers", type=int, default=8)
-        parser.add_argument("--seed", type=int, default=32)
+        parser.add_argument("--seed", type=int, default=42)
         parser.add_argument("--data_root", type=str, default="data")
         parser.add_argument("--distributed_backend", type=str, default="dp")
-        parser.add_argument("--amp_level", type=str, default="O0")
+        parser.add_argument("--amp_level", type=str, default="O2")
         parser.add_argument("--train_layers", type=int, default=3)
         parser.add_argument("--trans_prob", type=float, default=0.5)
         parser.add_argument("--max_epochs", type=int, default=60)

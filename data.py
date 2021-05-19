@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 import copy
 import os
-import pathlib
-
 import numpy as np
 import torch
 import torchvision
-import torchvision.transforms as T
 from PIL import Image
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
@@ -19,12 +16,20 @@ import utils
 
 class BedsoreLMDB(object):
     def __init__(self,
+                 subset,
                  root='data',
                  transforms=None,
-                 image_set='train',
-                 val=False,
                  chunk_id=0,
-                 chunk_num=5):
+                 chunk_num=10):
+        if subset in ['train', 'valid']:
+            image_set = 'train'
+        elif subset == 'full':
+            image_set = 'trainval'
+        elif subset == 'test':
+            image_set = 'val'
+        else:
+            raise ValueError
+
         self.root = root
         self.transforms = transforms
         self.data = torchvision.datasets.VOCDetection(root,
@@ -39,19 +44,23 @@ class BedsoreLMDB(object):
             '深部组织损伤': 6
         }
 
-        if chunk_num > 0:  # 如果是训练集，划分一个验证集出来
-            torch.manual_seed(32)
+        if subset in ['train', 'valid']:  # 如果是训练集，划分一个验证集出来
+            torch.manual_seed(42)
             sample_id = torch.randperm(len(self.data))
             valid_id = sample_id.chunk(chunk_num)[chunk_id].tolist()
             train_id = list(set(sample_id.tolist()) - set(valid_id))
-            if val == True:
+            if subset == 'valid':
                 self.sample_id = valid_id
             else:
                 self.sample_id = train_id
-        else:
+            env = lmdb.open(f'{self.root}/TRAIN_LMDB')
+        elif subset == 'full':
+            env = lmdb.open(f'{self.root}/TRAIN_LMDB')
+            self.sample_id = list(range(len(self.data)))
+        elif subset == 'test':
+            env = lmdb.open(f'{self.root}/TEST_LMDB')
             self.sample_id = list(range(len(self.data)))
 
-        env = lmdb.open(f'{self.root}/arr_lmdb')
         self.txn = env.begin(write=False)
 
     def __getitem__(self, idx):
@@ -336,33 +345,26 @@ class BedsoreLMDBDataModule(LightningDataModule):
             album.ShiftScaleRotate(shift_limit=0, scale_limit=0, p=trans_prob, rotate_limit=90),
             album.RandomBrightnessContrast(p=trans_prob),
             ToTensor()
-        ],
-            bbox_params=album.BboxParams(
-            format='pascal_voc',
-            label_fields=['category_ids']))
+        ], bbox_params=album.BboxParams(format='pascal_voc', label_fields=['category_ids']))
+
         tfmc_valid = album.Compose([ToTensor()],
-                                   bbox_params=album.BboxParams(
-                                       format='pascal_voc',
-                                       label_fields=['category_ids']))
+                                   bbox_params=album.BboxParams(format='pascal_voc', label_fields=['category_ids']))
 
-        self.train_ds = BedsoreLMDB(self.root,
+        self.train_ds = BedsoreLMDB(root=self.root,
                                     transforms=tfmc_train,
-                                    image_set='train',
-                                    val=False,
+                                    subset='train',
                                     chunk_id=chunk_id,
                                     chunk_num=chunk_num)
 
-        self.valid_ds = BedsoreLMDB(self.root,
+        self.valid_ds = BedsoreLMDB(root=self.root,
                                     transforms=tfmc_valid,
-                                    image_set='train',
-                                    val=True,
+                                    subset='valid',
                                     chunk_id=chunk_id,
                                     chunk_num=chunk_num)
 
-        self.test_ds = BedsoreLMDB(self.root,
+        self.test_ds = BedsoreLMDB(root=self.root,
                                    transforms=tfmc_valid,
-                                   image_set='val',
-                                   chunk_num=0)
+                                   subset='test')
 
     def train_dataloader(self):
         return DataLoader(self.train_ds,

@@ -1,22 +1,17 @@
 import os
 import lmdb
-import cv2
 import numpy as np
 from PIL import Image
-from pathlib import Path
 from tqdm import tqdm
-import torch
-import torchvision.transforms as T
 import torchvision
 
-LMDB_NAME = 'data/arr_lmdb'
 
-if __name__ == "__main__":
+def make_lmdb(image_set, out_name):
     ds = torchvision.datasets.VOCDetection('data',
                                            year='2007',
-                                           image_set='trainval')
+                                           image_set=image_set)
     # make byte lmdb
-    env = lmdb.open(LMDB_NAME, map_size=int(3e10))
+    env = lmdb.open(out_name, map_size=int(3e10))
     for i, d in enumerate(tqdm(ds)):
         with env.begin(write=True) as txn:
             fname = d[1]['annotation']['filename'][:-4]
@@ -36,3 +31,8 @@ if __name__ == "__main__":
             txn.put(f'data_{i}'.encode(), byte)
             txn.put(f'anno_{i}'.encode(), anno.encode())
     env.close()
+
+
+if __name__ == "__main__":
+    make_lmdb(image_set='train', out_name='data/TRAIN_LMDB')
+    make_lmdb(image_set='val', out_name='data/TEST_LMDB')
