@@ -16,76 +16,35 @@ from logger import MLFlowLogger2
 from torchvision.models.detection import MaskRCNN
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 
-
 class MyFasterRCNN(pl.LightningModule):
     def __init__(self, hparams):
         super().__init__()
         self.hparams = hparams
         if self.hparams.backbone == "mobilenet":
-            if self.hparams.backbone_ckpt != "":
-                backbone = MocoV2.load_from_checkpoint(
-                    self.hparams.backbone_ckpt, strict=False)
-                backbone = backbone.encoder_q
-                backbone = backbone.features
-            else:
-                backbone = torchvision.models.mobilenet_v2(
-                    pretrained=True).features
-
+            backbone = torchvision.models.mobilenet_v2(pretrained=True).features
             backbone.out_channels = 1280
-            anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256,
-                                                       512), ),
-                                               aspect_ratios=((0.5, 1.0,
-                                                               2.0), ))
+        elif self.hparams.backbone == "efficientnet":
+            backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+            backbone.out_channels = 1280
 
-            roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-                featmap_names=["0"], output_size=7, sampling_ratio=2)
-            mask_roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-                featmap_names=["0"], output_size=14, sampling_ratio=2)
-            self.net = MaskRCNN(
-                backbone,
-                num_classes=10,
-                min_size=400,
-                max_size=800,
-                rpn_anchor_generator=anchor_generator,
-                box_roi_pool=roi_pooler,
-                mask_roi_pool=mask_roi_pooler,
-            )
-        elif self.hparams.backbone == "resnet50":
-            if self.hparams.backbone_ckpt != "":
-                backbone = MocoV2.load_from_checkpoint(
-                    self.hparams.backbone_ckpt, strict=False)
-                backbone = backbone.encoder_q
-                backbone = torch.nn.Sequential(*(
-                    list(backbone.children())[:-2]))
-                backbone.out_channels = 2048
-                anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256,
-                                                           512), ),
-                                                   aspect_ratios=((0.5, 1.0,
-                                                                   2.0), ))
+        anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256,
+                                                   512), ),
+                                           aspect_ratios=((0.5, 1.0,
+                                                           2.0), ))
 
-                roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-                    featmap_names=["0"], output_size=7, sampling_ratio=2)
-                mask_roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-                    featmap_names=["0"], output_size=14, sampling_ratio=2)
-                self.net = MaskRCNN(
-                    backbone,
-                    num_classes=10,
-                    min_size=400,
-                    max_size=800,
-                    rpn_anchor_generator=anchor_generator,
-                    box_roi_pool=roi_pooler,
-                    mask_roi_pool=mask_roi_pooler,
-                )
-            else:
-                self.net = maskrcnn_resnet50_fpn(
-                    pretrained=True,
-                    trainable_backbone_layers=self.hparams.train_layers,
-                    min_size=400,
-                    max_size=800,
-                )
-                in_features = self.net.roi_heads.box_predictor.cls_score.in_features
-                self.net.roi_heads.box_predictor = FastRCNNPredictor(
-                    in_features, self.hparams.num_classes)
+        roi_pooler = torchvision.ops.MultiScaleRoIAlign(
+            featmap_names=["0"], output_size=7, sampling_ratio=2)
+        mask_roi_pooler = torchvision.ops.MultiScaleRoIAlign(
+            featmap_names=["0"], output_size=14, sampling_ratio=2)
+        self.net = MaskRCNN(
+            backbone,
+            num_classes=10,
+            min_size=400,
+            max_size=800,
+            rpn_anchor_generator=anchor_generator,
+            box_roi_pool=roi_pooler,
+            mask_roi_pool=mask_roi_pooler,
+        )
 
     def forward(self, images, targets=None):
         if targets is not None:

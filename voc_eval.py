@@ -86,9 +86,11 @@ def voc_eval(detpath,
 
     detpath: Path to detections
         detpath.format(classname) should produce the detection results file.
+        也可以直接输入列表
     annopath: Path to annotations
         annopath.format(imagename) should be the xml annotations file.
     imagesetfile: Text file containing the list of images, one image per line.
+        也可以直接输入列表
     classname: Category name (duh)
     cachedir: Directory for caching the annotations
     [ovthresh]: Overlap threshold (default = 0.5)
