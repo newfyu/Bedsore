@@ -15,6 +15,18 @@ from data import BedsoreDataModule, BedsoreLMDBDataModule
 from logger import MLFlowLogger2
 from torchvision.models.detection import MaskRCNN
 from torchvision.models.detection.anchor_utils import AnchorGenerator
+from efficientnet_pytorch import EfficientNet
+
+
+class EfficientNetBackBone(torch.nn.Module):
+
+    def __init__(self, model_name):
+        super().__init__()
+        self.model = EfficientNet.from_pretrained(model_name)
+
+    def forward(self, x):
+        return self.model.extract_features(x)
+
 
 class MyFasterRCNN(pl.LightningModule):
     def __init__(self, hparams):
@@ -23,8 +35,8 @@ class MyFasterRCNN(pl.LightningModule):
         if self.hparams.backbone == "mobilenet":
             backbone = torchvision.models.mobilenet_v2(pretrained=True).features
             backbone.out_channels = 1280
-        elif self.hparams.backbone == "efficientnet":
-            backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+        elif "efficientnet" in self.hparams.backbone:
+            backbone = EfficientNetBackBone(self.hparams.backbone)
             backbone.out_channels = 1280
 
         anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256,
@@ -113,9 +125,10 @@ class MyFasterRCNN(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         self.net.eval()
         image, target = batch
-        output = self(image, target)
+        output = self(image, target)[0]
+        #  output = utils.same_class_remove(output)
         detfile = []
-        detfile.append(utils.out2detfile(target[0], output[0]))
+        detfile.append(utils.out2detfile(target[0], output))
         return detfile, target[0]["fname"]
 
     def test_epoch_end(self, outputs):

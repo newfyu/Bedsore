@@ -102,7 +102,6 @@ def same_class_remove(out, score_th=0.5, overlap_th=0.9):
             ind = list(ind)
             for i in ind:
                 for j in ind[i + 1:]:
-                    print(i, j)
                     box_i = out['boxes'][i].detach()
                     box_j = out['boxes'][j].detach()
                     box_cat = out['boxes'][[i, j]]
@@ -124,5 +123,5 @@ def same_class_remove(out, score_th=0.5, overlap_th=0.9):
 
                         ovmin = area_ov / area_min
                         if ovmin.item() > overlap_th:
-                            out['scores'][pending] = 0
+                            out['scores'][pending] = 0.
     return out
