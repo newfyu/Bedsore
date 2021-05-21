@@ -16,7 +16,7 @@ from logger import MLFlowLogger2
 from torchvision.models.detection import MaskRCNN
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 from efficientnet_pytorch import EfficientNet
-
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 class EfficientNetBackBone(torch.nn.Module):
 
@@ -31,9 +31,10 @@ class EfficientNetBackBone(torch.nn.Module):
 class MyFasterRCNN(pl.LightningModule):
     def __init__(self, hparams):
         super().__init__()
-        self.hparams = hparams
+        self.save_hyperparameters(hparams)
         if self.hparams.backbone == "mobilenet":
-            backbone = torchvision.models.mobilenet_v2(pretrained=True).features
+            backbone = torchvision.models.mobilenet_v2(
+                pretrained=True).features
             backbone.out_channels = 1280
         elif "efficientnet" in self.hparams.backbone:
             backbone = EfficientNetBackBone(self.hparams.backbone)
@@ -68,9 +69,10 @@ class MyFasterRCNN(pl.LightningModule):
         images, targets = batch
         loss_dict = self(images, targets)
         loss = sum(loss for loss in loss_dict.values())
-        result = pl.TrainResult(minimize=loss)
-        result.log_dict({"train_loss": loss}, prog_bar=True)
-        return result
+        #  result = pl.TrainResult(minimize=loss)
+        #  result.log_dict({"train_loss": loss}, prog_bar=True)
+        self.log('train_loss',loss, prog_bar=True)
+        return loss
 
     def cal_ap(self, outputs):
         outputs = list(zip(*outputs))
@@ -117,9 +119,8 @@ class MyFasterRCNN(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         mAP, class_ap = self.cal_ap(outputs)
-        result = pl.EvalResult(checkpoint_on=-torch.FloatTensor([mAP]))
-        result.log_dict({"valid_map": mAP}, prog_bar=True)
-        return result
+        self.log("valid_map", mAP, prog_bar=True)
+        return mAP
 
     @torch.no_grad()
     def test_step(self, batch, batch_idx):
@@ -133,12 +134,10 @@ class MyFasterRCNN(pl.LightningModule):
 
     def test_epoch_end(self, outputs):
         mAP, class_ap = self.cal_ap(outputs)
-        result = pl.EvalResult(checkpoint_on=torch.FloatTensor([mAP]))
-        result.log_dict({"valid_mAP": mAP})
         print(class_ap)
-        result = pl.EvalResult(checkpoint_on=torch.FloatTensor([mAP]))
-        result.log_dict({"test_mAP": mAP})
-        return result
+        mAP, class_ap = self.cal_ap(outputs)
+        self.log("valid_map", mAP, prog_bar=True)
+        return mAP
 
     def configure_optimizers(self):
         #  optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
@@ -210,6 +209,8 @@ def main():
         else:
             logger = None
         trainer.logger = logger
+        checkpoint_callback = ModelCheckpoint(monitor='valid_map')
+        trainer.callbacks.append(checkpoint_callback)
         trainer.fit(model, dm)
         trainer.test()
 
