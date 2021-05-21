@@ -209,7 +209,7 @@ def main():
         else:
             logger = None
         trainer.logger = logger
-        checkpoint_callback = ModelCheckpoint(monitor='valid_map')
+        checkpoint_callback = ModelCheckpoint(monitor='valid_map',save_last=True,mode='max')
         trainer.callbacks.append(checkpoint_callback)
         trainer.fit(model, dm)
         trainer.test()
