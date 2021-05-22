@@ -177,7 +177,7 @@ class MyFasterRCNN(pl.LightningModule):
         parser.add_argument("--trans_prob", type=float, default=0.5)
         parser.add_argument("--max_epochs", type=int, default=60)
         parser.add_argument("--test_ckpt", type=str, default="")
-        parser.add_argument("--backbone", type=str, default="mobilenet")
+        parser.add_argument("--backbone", type=str, default="mobilenet_v3")
         parser.add_argument("--backbone_ckpt", type=str, default="")
         return parser
 

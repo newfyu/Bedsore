@@ -1,0 +1,6 @@
+pytorch-lightning
+mlflow
+demjson
+albumentations
+lmdb
+efficientnet_pytorch

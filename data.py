@@ -339,7 +339,7 @@ class BedsoreLMDBDataModule(LightningDataModule):
         self.num_workers = num_workers
 
         tfmc_train = album.Compose([
-            #  album.RandomSizedBBoxSafeCrop(800, 800, p=trans_prob, erosion_rate=0.1),
+            album.RandomSizedBBoxSafeCrop(800, 800, p=trans_prob, erosion_rate=0.1),
             album.HorizontalFlip(p=trans_prob),
             album.VerticalFlip(p=trans_prob),
             album.ShiftScaleRotate(shift_limit=0, scale_limit=0, p=trans_prob, rotate_limit=90),
@@ -361,10 +361,6 @@ class BedsoreLMDBDataModule(LightningDataModule):
                                     subset='valid',
                                     chunk_id=chunk_id,
                                     chunk_num=chunk_num)
-        # cheat
-        #  self.valid_ds = BedsoreLMDB(root=self.root,
-        #  transforms=tfmc_valid,
-        #  subset='test')
 
         self.test_ds = BedsoreLMDB(root=self.root,
                                    transforms=tfmc_valid,
