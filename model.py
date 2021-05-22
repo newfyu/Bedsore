@@ -36,6 +36,10 @@ class MyFasterRCNN(pl.LightningModule):
             backbone = torchvision.models.mobilenet_v2(
                 pretrained=True).features
             backbone.out_channels = 1280
+        elif self.hparams.backbone == "mobilenet_v3":
+            backbone = torchvision.models.mobilenet_v3_large(
+                pretrained=True).features
+            backbone.out_channels = 960
         elif "efficientnet" in self.hparams.backbone:
             backbone = EfficientNetBackBone(self.hparams.backbone)
             backbone.out_channels = 1280
