@@ -136,8 +136,8 @@ class MyFasterRCNN(pl.LightningModule):
         return mAP
 
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
-        #  optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        #  optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr, momentum=0.9)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
         return optimizer
 
     #  def configure_optimizers(self):
