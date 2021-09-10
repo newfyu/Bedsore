@@ -10,6 +10,8 @@ SZ = 512
 
 col1, col2, col3 = st.columns([1, 10, 1])
 
+
+
 with col1:
     st.write('')
 
@@ -23,11 +25,35 @@ with col2:
         wait_text1 = '等待上传图片'
         wait_text2 = '正在分析，请稍等……'
         wait_text3 = '分析完毕'
+        st.sidebar.markdown("""
+### 图例
+1 1期    
+2 2期   
+3 3期   
+4 4期   
+5 不可分期   
+6 深部组织损伤    
+:full_moon: 腐肉    
+:red_circle: 肉芽    
+:large_blue_circle: 坏死
+""")
     else:
         title_text = 'Automatic Staging System for Pressure Injury'
         wait_text1 = 'Waiting to upload pictures'
         wait_text2 = 'Analyzing, please wait……'
         wait_text3 = 'Analysis complete'
+        st.sidebar.markdown("""
+### Legend
+1 Stage1    
+2 Stage2   
+3 Stage3   
+4 Stage4   
+5 Unstageable   
+6 Deep Tissue Pressure Injury    
+:full_moon: Slough    
+:red_circle: Granulation    
+:large_blue_circle: Necrotic
+""")
     st.title(title_text)
 
 # load model
