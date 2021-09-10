@@ -6,12 +6,13 @@ lightning_logs
 mlruns
 .ipynb_checkpoints
 checkpoints
+script
 temp
 check_image
+upload
+outputs
 .vim
 .vscode
 *.tar
 *.zip
 task_测试题*
-upload
-outputs
