@@ -1,1 +1,2 @@
 mlruns/3/8125991a77df4bf9a5499367b41e3970/checkpoints/epoch=59-step=16979.ckpt filter=lfs diff=lfs merge=lfs -text
+ckpt/current.ckpt filter=lfs diff=lfs merge=lfs -text
