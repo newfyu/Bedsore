@@ -14,5 +14,4 @@ outputs
 .vscode
 *.tar
 *.zip
-*.png
 task_测试题*
