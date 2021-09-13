@@ -57,7 +57,8 @@ with col2:
     st.title(title_text)
 
 # load model
-    model = MyFasterRCNN.load_from_checkpoint('mlruns/3/8125991a77df4bf9a5499367b41e3970/checkpoints/epoch=59-step=16979.ckpt')
+    #  model = MyFasterRCNN.load_from_checkpoint('mlruns/3/8125991a77df4bf9a5499367b41e3970/checkpoints/epoch=59-step=16979.ckpt')
+    model = MyFasterRCNN.load_from_checkpoint('ckpt/current.ckpt')
     net = model.net
     net.eval()
 
