@@ -15,7 +15,7 @@ col1, col2, col3 = st.columns([1, 10, 1])
 
 
 @st.cache
-def load_model():
+def down_ckpt():
     if not os.path.exists(CKPT_PATH):
         url = 'https://drive.google.com/uc?id=1k6wQ27b0heo3Wowv7lGJor_bkG2GCBcE'
         st.spinner('下载模型')
@@ -23,8 +23,13 @@ def load_model():
     else:
         st.spinner('已经下载模型')
 
-
-load_model()
+@st.cache
+def load_model():
+    down_ckpt()
+    model = MyFasterRCNN.load_from_checkpoint(CKPT_PATH)
+    model = model.net
+    model.eval()
+    return model
 
 
 with col1:
@@ -74,9 +79,10 @@ with col2:
 
 # load model
 #  model = MyFasterRCNN.load_from_checkpoint('mlruns/3/8125991a77df4bf9a5499367b41e3970/checkpoints/epoch=59-step=16979.ckpt')
-    model = MyFasterRCNN.load_from_checkpoint(CKPT_PATH)
-    net = model.net
-    net.eval()
+    #  model = MyFasterRCNN.load_from_checkpoint(CKPT_PATH)
+    #  net = model.net
+    #  net.eval()
+    model = load_model()
 
 # wait image
     uploaded_file = st.file_uploader('', type=['jpg', 'png', 'jpeg', 'bmp'])
