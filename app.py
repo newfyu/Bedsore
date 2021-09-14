@@ -73,12 +73,12 @@ with col2:
 
     pred_img = Image.open(uploaded_file)
     t = int(time.time())
-    pred_img.save(f'upload/{t}.png')
+    #  pred_img.save(f'upload/{t}.png') # save upload image
 
     x = T.ToTensor()(pred_img)
     out = net([x], None)[0]
     out_image = draw_bbox(x, out, th=0.5).resize((SZ, SZ))
-    out_image.save(f'upload/{t}_out.png')
+    #  out_image.save(f'upload/{t}_out.png') # save output image
 
     st.image(pred_img.resize((SZ, SZ)))
     st.image(out_image)
