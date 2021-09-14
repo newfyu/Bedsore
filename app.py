@@ -82,7 +82,7 @@ with col2:
     #  model = MyFasterRCNN.load_from_checkpoint(CKPT_PATH)
     #  net = model.net
     #  net.eval()
-    model = load_model()
+    net = load_model()
 
 # wait image
     uploaded_file = st.file_uploader('', type=['jpg', 'png', 'jpeg', 'bmp'])
