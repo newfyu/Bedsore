@@ -15,4 +15,5 @@ outputs
 *.tar
 *.zip
 *.png
+*.ckpt
 task_测试题*
