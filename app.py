@@ -84,7 +84,7 @@ with col2:
     #  net.eval()
     net = load_model()
 
-# wait image
+    # wait image
     uploaded_file = st.file_uploader('', type=['jpg', 'png', 'jpeg', 'bmp'])
     wait_msg = st.empty()
     if not uploaded_file:
