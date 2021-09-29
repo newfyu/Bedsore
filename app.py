@@ -13,6 +13,31 @@ CKPT_PATH = 'model.ckpt'
 
 col1, col2, col3 = st.columns([1, 10, 1])
 
+def set_page_title(title):
+    st.sidebar.markdown(unsafe_allow_html=True, body=f"""
+        <iframe height=0 srcdoc="<script>
+            const title = window.parent.document.querySelector('title') \
+
+            const oldObserver = window.parent.titleObserver
+            if (oldObserver) {{
+                oldObserver.disconnect()
+            }} \
+
+            const newObserver = new MutationObserver(function(mutations) {{
+                const target = mutations[0].target
+                if (target.text !== '{title}') {{
+                    target.text = '{title}'
+                }}
+            }}) \
+
+            newObserver.observe(title, {{ childList: true }})
+            window.parent.titleObserver = newObserver \
+
+            title.text = '{title}'
+        </script>" />
+    """)
+
+
 
 @st.cache
 def down_ckpt():
@@ -75,6 +100,7 @@ with col2:
 :large_blue_circle: Necrotic    
 """)
     st.title(title_text)
+    set_page_title(title_text)
 
 
 # load model
@@ -95,12 +121,12 @@ with col2:
 
     pred_img = Image.open(uploaded_file)
     t = int(time.time())
-    #  pred_img.save(f'upload/{t}.png') # save upload image
+    pred_img.save(f'upload/{t}.png') # save upload image
 
     x = T.ToTensor()(pred_img)
     out = net([x], None)[0]
     out_image = draw_bbox(x, out, th=0.5).resize((SZ, SZ))
-    #  out_image.save(f'upload/{t}_out.png') # save output image
+    out_image.save(f'upload/{t}_out.png') # save output image
 
     st.image(pred_img.resize((SZ, SZ)))
     st.image(out_image)

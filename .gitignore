@@ -16,4 +16,5 @@ outputs
 *.zip
 *.png
 *.ckpt
+*.pth
 task_测试题*
