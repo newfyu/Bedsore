@@ -1,4 +1,3 @@
-import demjson
 import torchvision
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np

@@ -66,7 +66,7 @@ with col3:
 with col2:
     lang = st.radio('', ('中文', 'English'))
     if lang == '中文':
-        title_text = '压力性损伤自动分期系统'
+        title_text = '压力性损伤智能分期系统'
         wait_text1 = '等待上传图片'
         wait_text2 = '正在分析，请稍等……'
         wait_text3 = '分析完毕'
@@ -124,11 +124,14 @@ with col2:
     pred_img.save(f'upload/{t}.png') # save upload image
 
     x = T.ToTensor()(pred_img)
+    if x.shape[0]==4:
+        x = x[:3]
     out = net([x], None)[0]
     out_image = draw_bbox(x, out, th=0.5).resize((SZ, SZ))
     out_image.save(f'upload/{t}_out.png') # save output image
 
-    st.image(pred_img.resize((SZ, SZ)))
+    
+    # st.image(pred_img.resize((SZ, SZ)))
     st.image(out_image)
     wait_msg.text(wait_text3)
     uploaded_file = None
